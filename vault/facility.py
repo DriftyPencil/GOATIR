@@ -51,6 +51,34 @@ VECTOR_TITLES = {
     "verbose_error": "Verbose error disclosure",
 }
 
+# These are product prompts, rather than prescribed exploits.  Gemini receives one
+# for a new run and produces the actual endpoint, source and weakness from its own
+# limited first-draft implementation.  The old vector labels remain only as the
+# internal flag/patch bookkeeping needed by the game and legacy test surface.
+BUILD_STARTERS = [
+    "a tiny visitor support desk that looks up a service request",
+    "a lightweight parcel collection page for reception",
+    "a maintenance note board for facility staff",
+    "a guest pass status checker for the lobby",
+    "a room booking helper for the workshop",
+    "a public lost-and-found assistant for the front desk",
+    "a service-status question form for visitors",
+]
+
+
+def _build_brief(facility_id: str, level: int) -> dict:
+    seed = hashlib.sha256(f"{facility_id}:{level}".encode()).hexdigest()[:10]
+    choice = int(seed[:4], 16) % len(BUILD_STARTERS)
+    return {
+        "run_seed": seed,
+        "product_goal": BUILD_STARTERS[choice],
+        "delivery_context": (
+            "Simply is shipping a useful first draft quickly, before Mr Kak has reviewed this "
+            "new feature. Let normal limited-builder mistakes arise from the implementation; do "
+            "not turn it into a labelled capture-the-flag puzzle."
+        ),
+    }
+
 # Progressive hints. The player reveals them one at a time for the lowest open weakness.
 HINTS = {
     "agent_prompt_injection": [
@@ -327,6 +355,7 @@ class Facility:
     codebase_files: list[CodebaseFile] = field(default_factory=list)
     inherited_files: list[CodebaseFile] = field(default_factory=list)
     codebase_history: list[dict] = field(default_factory=list)
+    patched_routes: dict[str, dict] = field(default_factory=dict)
     last_patch: dict | None = None
     log: list[dict] = field(default_factory=list)
     touched: float = field(default_factory=time.monotonic)
@@ -342,11 +371,18 @@ class Facility:
         openv = self.open_vectors()
         return openv[0] if openv else None
 
+    def active_hints(self, vector: str | None = None) -> list[str]:
+        """Prefer the hints that were generated with this specific website revision."""
+        if vector and vector == self.next_vector() and self.challenge and self.challenge.hint_ladder:
+            return self.challenge.hint_ladder
+        return HINTS.get(vector or "", [])
+
     def public(self) -> dict:
         openv = self.open_vectors()
         current = self.next_vector()
         revealed = self.hints.get(current, 0) if current else 0
-        available = current is not None and revealed < len(HINTS.get(current, []))
+        active_hints = self.active_hints(current)
+        available = current is not None and revealed < len(active_hints)
         challenge = None
         if current and self.challenge:
             challenge = {
@@ -356,6 +392,7 @@ class Facility:
                 "briefing": self.challenge.briefing,
                 "vulnerable_code": self.challenge.vulnerable_code.replace("<sid>", self.id),
                 "builder_note": self.challenge.builder_note,
+                "endpoint": self.challenge.endpoint.model_dump(),
                 "source": self.challenge_source,
                 "validation": self.challenge_validation,
             }
@@ -377,7 +414,7 @@ class Facility:
                 "history": self.codebase_history[-12:],
             },
             "last_patch": self.last_patch,
-            "revealed_hints": [HINTS[current][i].replace("<sid>", self.id) for i in range(revealed)]
+            "revealed_hints": [active_hints[i].replace("<sid>", self.id) for i in range(revealed)]
             if current
             else [],
             "hint_available": available,
@@ -431,7 +468,7 @@ class FacilityEngine:
         if not current:
             return fac.public()
         shown = fac.hints.get(current, 0)
-        if shown < len(HINTS[current]):
+        if shown < len(fac.active_hints(current)):
             fac.hints[current] = shown + 1
         return fac.public()
 
@@ -446,6 +483,13 @@ class FacilityEngine:
                 400, "That's not a valid breakthrough for the current build. Capture a fresh flag."
             )
         current = fac.next_vector()
+        if current == matched and fac.challenge:
+            # Keep the secured revision reachable so a player can verify that the
+            # exact route they broke now refuses the same request.
+            fac.patched_routes[fac.challenge.endpoint.path] = {
+                "vector": matched,
+                "challenge": fac.challenge,
+            }
         patch_code = (
             fac.challenge.patched_code
             if current == matched and fac.challenge
@@ -537,7 +581,7 @@ def build_facility_router(
                     agents.generate_facility_challenge(
                         level=len(fac.patched) + 1,
                         vector=vector,
-                        blueprint=CHALLENGE_BLUEPRINTS[vector],
+                        blueprint=_build_brief(fac.id, len(fac.patched) + 1),
                         previous_files=[
                             file.model_dump()
                             for file in (fac.inherited_files or fac.codebase_files)
@@ -550,12 +594,15 @@ def build_facility_router(
                 if settings is not None:
                     from vault.challenge_evaluation import evaluate_generated_challenge
 
-                    contract = CHALLENGE_CONTRACTS[vector]
                     validation = await evaluate_generated_challenge(
                         generated,
                         settings,
-                        vulnerable_required=contract["vulnerable"],
-                        patched_required=contract["patched"],
+                        # The model chooses the feature and endpoint.  The worker
+                        # verifies the generated route and that the protected value
+                        # exists only in the vulnerable revision, without forcing a
+                        # pre-written curriculum route or exploit shape.
+                        vulnerable_required=[generated.endpoint.path, "facility_key"],
+                        patched_required=[generated.endpoint.path],
                     )
                     fac.challenge_validation = validation.model_dump(mode="json")
                     if not validation.passed:
@@ -619,7 +666,76 @@ def build_facility_router(
         result["state"] = fac.public()
         return result
 
-    # ---- The vulnerable surface. Each weakness stays open until Mr Kak teaches the patch. ----
+    # ---- Generated website runtime ---------------------------------------------------------
+    # The web process never imports model-authored Python.  Gemini receives the bounded source
+    # as data and simulates the one declared public route.  This lets each run have a genuinely
+    # different app shape while retaining a strict process boundary around generated code.
+    @router.api_route("/{sid}/site/{runtime_path:path}", methods=["GET", "POST"])
+    async def generated_site(sid: str, runtime_path: str, request: Request):
+        fac = engine.get(sid)
+        path = f"/site/{runtime_path}"
+        current = fac.next_vector()
+        patch_active = False
+        vector = current
+        challenge = fac.challenge if fac.challenge and fac.challenge.endpoint.path == path else None
+        if challenge is None:
+            saved = fac.patched_routes.get(path)
+            if saved:
+                challenge = saved["challenge"]
+                vector = saved["vector"]
+                patch_active = True
+        if challenge is None or vector is None:
+            raise HTTPException(404, "This generated website has no route at that path.")
+        if request.method != challenge.endpoint.method:
+            raise HTTPException(405, f"Use {challenge.endpoint.method} for this generated route.")
+        if agents is None:
+            raise HTTPException(503, "This generated website needs the live Gemini runtime.")
+        try:
+            raw_body = await request.body()
+            try:
+                body: object = json.loads(raw_body) if raw_body else {}
+            except json.JSONDecodeError:
+                body = raw_body.decode("utf-8", errors="replace")[:4000]
+            request_data = {
+                "method": request.method,
+                "path": path,
+                "query": dict(request.query_params),
+                "headers": {
+                    key: value
+                    for key, value in request.headers.items()
+                    if key in {"content-type", "x-user-role", "x-requested-with"}
+                },
+                "body": body,
+            }
+            reply = await asyncio.wait_for(
+                agents.run_sandbox_route(
+                    request_data=request_data,
+                    secret=_flag(vector, fac.secret),
+                    endpoint=challenge.endpoint.model_dump(),
+                    vulnerable_files=[file.model_dump() for file in challenge.vulnerable_files],
+                    patched_files=[file.model_dump() for file in challenge.patched_files],
+                    patch_active=patch_active,
+                ),
+                timeout=agent_timeout_seconds,
+            )
+        except TimeoutError as exc:
+            raise HTTPException(504, "Simply's generated website took too long to respond.") from exc
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("Generated website runtime failed (%s)", type(exc).__name__)
+            raise HTTPException(503, "The generated website is temporarily unavailable. Try again.") from exc
+        return JSONResponse(
+            {
+                "endpoint": challenge.endpoint.model_dump(),
+                "response": reply.body,
+                "runtime": "gemini",
+                "revision": len(fac.patched) + (0 if patch_active else 1),
+            },
+            status_code=reply.status,
+        )
+
+    # ---- Legacy curriculum routes. Retained for backwards-compatible local tests. ----
 
     @router.post("/{sid}/agent")
     async def facility_agent(sid: str, request: Request):

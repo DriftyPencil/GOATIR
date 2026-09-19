@@ -20,7 +20,7 @@
       <div class="top-actions">
         <label class="visually-hidden" for="mode-select">Mode</label>
         <select id="mode-select" class="pixel-select" disabled><option value="demo">Rehearsal</option><option value="live">Live · Gemini</option></select>
-        <button class="pixel-button map-button" id="map-button">◇ System map <span id="map-progress">2/?</span></button>
+        <button class="pixel-button map-button" id="map-button">◇ System diagram <span id="map-progress">architecture</span></button>
         <button class="pixel-button" id="how-to-button">?</button>
         <button class="pixel-button" id="new-session-button" disabled>↻ Restart</button>
       </div>
@@ -110,7 +110,7 @@
           <span>WEAKNESSES <b>unknown</b></span>
           <button type="button" class="hint-button" id="lab-hint-button">Ask for a hint</button>
         </div>
-        <div class="lab-hint" id="lab-hint-text">Start with the agent console or inspect what the browser can reach.</div>
+        <div class="lab-hint" id="lab-hint-text">Wait for Simply's fresh build, then use the generated route and read its code.</div>
         <section class="generated-challenge" aria-live="polite">
           <header><div><span class="eyebrow">CURRENT GENERATED BUILD</span><h2 id="lab-challenge-title">Loading challenge…</h2></div><span id="lab-challenge-source">template</span></header>
           <p id="lab-challenge-brief">Simply is assembling this level.</p>
@@ -126,8 +126,8 @@
         </section>
         <div class="lab-grid">
           <section class="lab-card agent-console">
-            <h2>▸ Agent prompt console</h2>
-            <p>Simply also built the facility agent. Test whether it follows visitor instructions too easily.</p>
+            <h2>▸ Legacy agent console</h2>
+            <p>An earlier feature kept for comparison. The current generated build and its route appear above.</p>
             <form id="lab-agent-form" class="lab-form inline-form">
               <input id="lab-agent-input" maxlength="2000" placeholder="Message the facility agent…" autocomplete="off">
               <button type="submit">SEND</button>
@@ -135,8 +135,8 @@
             <pre id="lab-agent-output" class="lab-output">// agent response appears here</pre>
           </section>
           <section class="lab-card request-console">
-            <h2>▸ Request console</h2>
-            <p>Probe the same API your browser is using.</p>
+            <h2>▸ Generated route runner</h2>
+            <p>Probe the API route Simply generated for this sandbox revision.</p>
             <form id="lab-request-form" class="lab-form">
               <div class="inline-form"><select id="lab-method"><option>GET</option><option>POST</option></select><input id="lab-path" value="/hack/api/SID/config.js" spellcheck="false"><button type="submit">RUN</button></div>
               <input id="lab-headers" placeholder='Optional headers JSON, e.g. {"X-User-Role":"admin"}' spellcheck="false">
@@ -162,10 +162,10 @@
       </section>
 
       <section class="system-map campaign-panel" id="map-panel" data-panel-content="map" hidden>
-        <header><div><span class="eyebrow">YOUR UNDERSTANDING</span><h2>System explorer</h2></div><p>Every coin reveals another part of the system. Select a discovered node to inspect how the code works.</p></header>
+        <header><div><span class="eyebrow">SYSTEM FUNDAMENTALS</span><h2>Runtime architecture</h2></div><p>Follow requests, endpoints, agents, state, generated code, and validation through the running system.</p></header>
         <div class="map-layout">
-          <div class="map-canvas" id="map-canvas" role="list" aria-label="Discovered system components"></div>
-          <aside class="map-inspector" id="map-inspector"><span class="eyebrow">SELECT A NODE</span><h3>The Evolving Vault</h3><p>Follow the data from your browser through Simply, Mr Kak, evaluation, and the patched facility.</p></aside>
+          <div class="map-canvas" id="map-canvas" role="list" aria-label="System architecture diagram"></div>
+          <aside class="map-inspector" id="map-inspector"><span class="eyebrow">SELECT A COMPONENT</span><h3>Architecture overview</h3><p>Arrows show how a request reaches an endpoint, agent, state store, generated codebase, or validation worker.</p></aside>
         </div>
       </section>
 

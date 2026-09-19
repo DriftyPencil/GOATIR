@@ -49,6 +49,19 @@ class CodebaseFile(BaseModel):
     content: str = Field(min_length=1, max_length=6000)
 
 
+class SandboxEndpoint(BaseModel):
+    """The generated public entry point of one sandbox website revision."""
+
+    method: Literal["GET", "POST"] = "POST"
+    path: str = Field(default="/site/assistant", pattern=r"^/site/[a-z0-9][a-z0-9_/-]{1,70}$")
+    input_guide: str = Field(default="Send a normal request to this endpoint.", max_length=250)
+
+
+class SandboxRuntimeReply(BaseModel):
+    status: int = Field(ge=200, le=599)
+    body: str = Field(min_length=1, max_length=4000)
+
+
 class GeneratedChallenge(BaseModel):
     """AI-authored application revision for mechanics enforced by the facility sandbox."""
 
@@ -57,6 +70,8 @@ class GeneratedChallenge(BaseModel):
     vulnerable_code: str = Field(min_length=10, max_length=4000)
     patched_code: str = Field(min_length=10, max_length=4000)
     builder_note: str = Field(default="Simply shipped a quick first draft.", max_length=300)
+    endpoint: SandboxEndpoint = Field(default_factory=SandboxEndpoint)
+    hint_ladder: list[str] = Field(default_factory=list, max_length=4)
     vulnerable_files: list[CodebaseFile] = Field(default_factory=list, max_length=4)
     patched_files: list[CodebaseFile] = Field(default_factory=list, max_length=4)
 

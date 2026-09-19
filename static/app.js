@@ -42,15 +42,32 @@
   let previousCoins = 0;
 
   const MAP_NODES = [
-    { id: "browser", unlock: 0, x: 8, y: 42, title: "Campaign UI", file: "static/app.js", detail: "The single-page campaign coordinates both attack surfaces, animation, coins, hints, and this progressive map." },
-    { id: "api", unlock: 0, x: 28, y: 18, title: "FastAPI gateway", file: "vault/main.py", detail: "The gateway creates isolated sessions and routes messages to the game engine or the intentionally vulnerable facility." },
-    { id: "goatir", unlock: 1, x: 28, y: 68, title: "Simply", file: "vault/agents.py", detail: "PydanticAI gives the inexperienced builder a typed response contract. Active defenses are injected as trusted instructions on every turn." },
-    { id: "policy", unlock: 2, x: 49, y: 18, title: "Leak detector", file: "vault/policy.py", detail: "The policy layer detects complete fictional secrets, including several encoded forms, and provides the deterministic rehearsal behavior." },
-    { id: "engine", unlock: 3, x: 49, y: 68, title: "Learning loop", file: "vault/engine.py", detail: "This state machine observes a real leak, asks Mr Kak for a diagnosis, evaluates a candidate defense, and rotates the exposed passcode." },
-    { id: "botir", unlock: 4, x: 70, y: 18, title: "Mr Kak", file: "vault/agents.py", detail: "The wise security officer classifies the exploit and teaches Simply. Only application-owned defense rules can become active." },
-    { id: "eval", unlock: 5, x: 70, y: 68, title: "Regression arena", file: "vault/evaluation.py", detail: "Every patch must block the captured attack and its variants while still answering harmless questions." },
-    { id: "facility", unlock: 6, x: 91, y: 42, title: "Hack facility", file: "vault/facility.py", detail: "The lab exposes multiple web and agent boundaries. Each captured flag activates a real server-side patch for that session." },
-    { id: "sandbox", unlock: 8, x: 91, y: 78, title: "Modal sandbox", file: "vault/eval_worker.py", detail: "The same trusted evaluation worker can run locally or in an isolated Modal sandbox. A failed runner always withholds the patch." },
+    { id: "browser", x: 8, y: 50, kind: "client", title: "Browser campaign UI", file: "static/app.js", detail: "The player sends prompt attacks and HTTP probes here. It renders sessions, coins, hints, and the generated sandbox codebase." },
+    { id: "gateway", x: 27, y: 50, kind: "api", title: "FastAPI gateway", file: "vault/main.py", detail: "The public boundary. It creates sessions, routes `/api/*` to the conversational vault, and routes `/hack/api/*` to the practice website." },
+    { id: "vault", x: 48, y: 20, kind: "api", title: "Conversation vault", file: "vault/engine.py", detail: "Handles `/api/sessions/:id/attack`: records a prompt, checks whether Simply exposed the synthetic passcode, then starts the learning loop." },
+    { id: "facility", x: 48, y: 53, kind: "api", title: "Generated sandbox website", file: "vault/facility.py", detail: "Handles `/hack/api/*`. It exposes the current game level, serves the intentionally weak practice boundary, and applies session-scoped patches." },
+    { id: "state", x: 48, y: 83, kind: "store", title: "Session state store", file: "vault/engine.py + vault/facility.py", detail: "An in-memory per-player store: messages, defenses, coins, flags, generated files, and the patch history. It resets when the single server process restarts." },
+    { id: "simply", x: 68, y: 20, kind: "agent", title: "Simply · builder agent", file: "vault/agents.py", detail: "A Gemini-backed agent that answers the vault and produces the next sandbox website revision from the prior secured files." },
+    { id: "mrkak", x: 68, y: 50, kind: "agent", title: "Mr Kak · security teacher", file: "vault/agents.py", detail: "Diagnoses observed prompt breaches and gives Simply the narrow security rule needed to patch the discovered mistake." },
+    { id: "codebase", x: 68, y: 80, kind: "store", title: "Versioned sandbox codebase", file: "Generated per facility session", detail: "The generated `app.py`, `web/index.html`, and `README.md` for this run. Each breach adds a Mr Kak patch revision before Simply continues building." },
+    { id: "gemini", x: 88, y: 25, kind: "model", title: "Gemini 3.5 Flash", file: "Google model API", detail: "Produces structured Simply and Mr Kak replies plus sandbox codebase revisions. It never executes generated code itself." },
+    { id: "modal", x: 88, y: 63, kind: "worker", title: "Modal validation sandbox", file: "vault/challenge_worker.py", detail: "A network-blocked worker parses, compiles, and inspects generated revisions before the game marks them as verified. It also runs defense regression checks." },
+  ];
+
+  const MAP_EDGES = [
+    ["browser", "gateway", "browser requests"],
+    ["gateway", "vault", "/api/sessions/:id/attack"],
+    ["gateway", "facility", "/hack/api/*"],
+    ["gateway", "state", "read / write sessions"],
+    ["vault", "simply", "prompt + policy"],
+    ["facility", "simply", "/agent + build request"],
+    ["facility", "codebase", "current revision"],
+    ["state", "facility", "flags + patches"],
+    ["simply", "mrkak", "observed breach"],
+    ["simply", "gemini", "structured generation"],
+    ["mrkak", "modal", "candidate defense"],
+    ["codebase", "modal", "validate generated files"],
+    ["modal", "facility", "verified patch"],
   ];
 
   function element(tag, className, text) {
@@ -576,33 +593,45 @@
     if (name === "map") renderMap(totalCoins());
   }
 
-  function renderMap(coins) {
-    const unlocked = MAP_NODES.filter((node) => coins >= node.unlock);
-    $("map-progress").textContent = `${unlocked.length}/?`;
+  function renderMap() {
+    $("map-progress").textContent = "architecture";
     const canvas = $("map-canvas");
-    if (!canvas || canvas.dataset.coins === String(coins)) return;
-    canvas.dataset.coins = String(coins);
+    if (!canvas || canvas.dataset.rendered === "true") return;
+    canvas.dataset.rendered = "true";
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 100 100");
     svg.setAttribute("aria-hidden", "true");
-    for (let index = 1; index < MAP_NODES.length; index++) {
-      const from = MAP_NODES[index - 1];
-      const to = MAP_NODES[index];
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+    marker.setAttribute("id", "map-arrow"); marker.setAttribute("viewBox", "0 0 10 10");
+    marker.setAttribute("refX", "8"); marker.setAttribute("refY", "5"); marker.setAttribute("markerWidth", "4"); marker.setAttribute("markerHeight", "4"); marker.setAttribute("orient", "auto-start-reverse");
+    const arrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    arrow.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    marker.append(arrow); defs.append(marker); svg.append(defs);
+    const lookup = Object.fromEntries(MAP_NODES.map((node) => [node.id, node]));
+    MAP_EDGES.forEach(([fromId, toId, label]) => {
+      const from = lookup[fromId];
+      const to = lookup[toId];
       const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
       line.setAttribute("x1", from.x); line.setAttribute("y1", from.y);
       line.setAttribute("x2", to.x); line.setAttribute("y2", to.y);
-      line.classList.toggle("discovered", coins >= to.unlock);
+      line.setAttribute("marker-end", "url(#map-arrow)");
+      line.classList.add("map-edge");
       svg.append(line);
-    }
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", ((from.x + to.x) / 2).toFixed(1));
+      text.setAttribute("y", ((from.y + to.y) / 2 - 1.5).toFixed(1));
+      text.setAttribute("class", "map-edge-label");
+      text.textContent = label;
+      svg.append(text);
+    });
     const nodes = MAP_NODES.map((node) => {
-      const discovered = coins >= node.unlock;
-      const button = element("button", `map-node${discovered ? " discovered" : " locked"}`);
+      const button = element("button", `map-node ${node.kind}`);
       button.type = "button";
       button.style.left = `${node.x}%`;
       button.style.top = `${node.y}%`;
-      button.disabled = !discovered;
-      button.innerHTML = `<i aria-hidden="true">${discovered ? "◆" : "?"}</i><span>${discovered ? node.title : "Undiscovered"}</span>`;
-      if (discovered) button.addEventListener("click", () => inspectNode(node));
+      button.innerHTML = `<i aria-hidden="true">${node.kind === "store" ? "▣" : node.kind === "agent" ? "◉" : node.kind === "model" ? "✦" : node.kind === "worker" ? "⚙" : "◇"}</i><span>${node.title}</span>`;
+      button.addEventListener("click", () => inspectNode(node));
       return button;
     });
     canvas.replaceChildren(svg, ...nodes);
@@ -610,7 +639,7 @@
 
   function inspectNode(node) {
     const inspector = $("map-inspector");
-    const eyebrow = element("span", "eyebrow", "DISCOVERED COMPONENT");
+    const eyebrow = element("span", "eyebrow", "SYSTEM COMPONENT");
     const title = element("h3", "", node.title);
     const detail = element("p", "", node.detail);
     const file = element("code", "map-file", node.file);
@@ -638,6 +667,11 @@
   }
 
   function facilityPath(path) { return path.replaceAll("SID", facilitySid || "SID"); }
+
+  function generatedFacilityPath(endpoint) {
+    if (!facilitySid || !endpoint?.path) return "";
+    return `/hack/api/${encodeURIComponent(facilitySid)}${endpoint.path}`;
+  }
 
   async function facilityApi(path, options = {}) {
     const response = await fetch(path, { ...options, headers: { "Content-Type": "application/json", ...(options.headers || {}) } });
@@ -687,11 +721,24 @@
       : notes.length ? "Make the hint more specific" : "Ask for a hint";
     const challenge = state.current_challenge;
     $("lab-challenge-title").textContent = challenge?.title || (state.hardened ? "Facility hardened" : "Loading challenge…");
-    $("lab-challenge-brief").textContent = challenge?.briefing || "No active generated weakness remains.";
+    const endpoint = challenge?.endpoint;
+    $("lab-challenge-brief").textContent = challenge
+      ? `${challenge.briefing} Route: ${endpoint?.method || "POST"} ${endpoint?.path || "/site/assistant"}. ${endpoint?.input_guide || ""}`
+      : "No active generated weakness remains.";
     $("lab-challenge-code").textContent = challenge?.vulnerable_code || "# all discovered paths are patched";
     $("lab-challenge-source").textContent = challenge?.source === "gemini"
       ? challenge?.validation?.backend === "modal" ? "Gemini · Modal verified" : "Gemini generated"
       : challenge?.source === "generating" ? "Gemini is generating…" : "safe template";
+    const generatedPath = generatedFacilityPath(endpoint);
+    if (challenge?.source === "gemini" && generatedPath) {
+      const pathInput = $("lab-path");
+      const previousGenerated = pathInput.dataset.generatedPath || "";
+      if (!pathInput.value || pathInput.value === previousGenerated || pathInput.value.includes("/config.js")) {
+        pathInput.value = generatedPath;
+        pathInput.dataset.generatedPath = generatedPath;
+        $("lab-method").value = endpoint.method || "POST";
+      }
+    }
     const lastPatch = state.last_patch;
     $("lab-last-patch").hidden = !lastPatch;
     if (lastPatch) $("lab-patch-code").textContent = lastPatch.code;

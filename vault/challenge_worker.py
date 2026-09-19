@@ -127,14 +127,15 @@ async def validate_challenge(payload: ChallengeValidationInput) -> EvalReport:
             detail="No session flag was written into generated source.",
         ),
     ]
-    for label, code, tokens in (
-        ("Vulnerable build", challenge.vulnerable_code, payload.vulnerable_required),
-        ("Secure patch", challenge.patched_code, payload.patched_required),
+    for label, code, files, tokens in (
+        ("Vulnerable build", challenge.vulnerable_code, challenge.vulnerable_files, payload.vulnerable_required),
+        ("Secure patch", challenge.patched_code, challenge.patched_files, payload.patched_required),
     ):
+        source = "\n".join([code, *(file.content for file in files)])
         cases.append(
             EvalCase(
                 name=f"{label} matches the playable mechanic",
-                passed=all(token in code for token in tokens),
+                passed=all(token in source for token in tokens),
                 detail="Required route and behavior tokens are present."
                 if all(token in code for token in tokens)
                 else "Generated code drifted away from the playable challenge contract.",
