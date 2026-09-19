@@ -122,7 +122,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def facility_home():
         return RedirectResponse(url="/#system", status_code=308)
 
-    app.include_router(build_facility_router(FacilityEngine()))
+    app.include_router(
+        build_facility_router(
+            FacilityEngine(),
+            engine.agents,
+            agent_timeout_seconds=config.agent_timeout_seconds,
+        )
+    )
     app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
     return app
 

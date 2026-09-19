@@ -42,8 +42,11 @@ Open http://127.0.0.1:8000. With no key, only **Rehearsal mode** is available. I
 
 | Mode | Guardian / coach | Regression runner |
 |------|------------------|-------------------|
-| Rehearsal (`demo`) | Deterministic policy (`vault/policy.py`) | local |
-| Live (`live`) | Gemini via PydanticAI (`vault/agents.py`) | `EVAL_BACKEND=local` or `modal` |
+| Rehearsal (`demo`) | Deterministic policy (`vault/policy.py`); the facility agent is visibly marked `rehearsal` | local |
+| Live (`live`) | Gemini via PydanticAI for the vault, teacher, and facility console (`vault/agents.py`) | `EVAL_BACKEND=local` or `modal` |
+
+Facility-console responses include `source` and `model` fields, so the built-in request
+console shows whether a reply came from Gemini or the offline rehearsal.
 
 Modal: run `uv run modal setup`, then set `EVAL_BACKEND=modal`. If Modal fails, the patch is withheld. It never silently falls back.
 

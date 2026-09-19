@@ -12,7 +12,9 @@ from vault.main import create_app
 
 @pytest.fixture
 def client():
-    return TestClient(create_app(Settings()))
+    # Facility route tests exercise the explicit offline rehearsal implementation.
+    # Live model behavior is covered separately with PydanticAI test models.
+    return TestClient(create_app(Settings(gemini_api_key="")))
 
 
 def new_facility(client):
@@ -99,7 +101,9 @@ def _capture_any(client, sid):
     if "SIMPLY{" in agent.get("message", ""):
         return agent["message"].split()[-1]
     if client.get(f"/hack/api/{sid}/_debug", params={"diag": "full"}).status_code == 200:
-        return client.get(f"/hack/api/{sid}/_debug", params={"diag": "full"}).json()["perimeter_key"]
+        return client.get(f"/hack/api/{sid}/_debug", params={"diag": "full"}).json()[
+            "perimeter_key"
+        ]
     if client.get(f"/hack/api/{sid}/records/1").status_code == 200:
         return client.get(f"/hack/api/{sid}/records/1").json()["note"].split()[-1]
     exported = client.get(f"/hack/api/{sid}/admin/export", headers={"X-User-Role": "admin"})
@@ -136,9 +140,10 @@ def test_trusted_header_and_verbose_error_are_really_patched(client):
     sid = new_facility(client)
     export = client.get(f"/hack/api/{sid}/admin/export", headers={"X-User-Role": "admin"})
     assert breach(client, sid, export.json()["recovery_key"]).status_code == 200
-    assert client.get(
-        f"/hack/api/{sid}/admin/export", headers={"X-User-Role": "admin"}
-    ).status_code == 403
+    assert (
+        client.get(f"/hack/api/{sid}/admin/export", headers={"X-User-Role": "admin"}).status_code
+        == 403
+    )
 
     leaked = client.get(f"/hack/api/{sid}/search", params={"q": "'"})
     assert leaked.status_code == 500

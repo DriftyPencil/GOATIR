@@ -42,6 +42,29 @@ async def test_missing_live_credentials_fails_explicitly():
         await service.reply("Hello", SECRET, [], [], "live")
 
 
+async def test_facility_console_uses_live_model_output():
+    service = AgentService(api_key="offline-test-key", model_name="gemini-3.5-flash")
+    service._ensure_live_agents()
+    assert service._facility is not None
+    with service._facility.override(
+        model=TestModel(
+            custom_output_text="That's a broad question—what would you like to inspect?"
+        )
+    ):
+        reply = await service.facility_reply("what", "SIMPLY{test-key}", patched=False)
+    assert reply == "That's a broad question—what would you like to inspect?"
+
+
+async def test_patched_facility_console_blocks_model_leak():
+    service = AgentService(api_key="offline-test-key", model_name="gemini-3.5-flash")
+    service._ensure_live_agents()
+    assert service._facility is not None
+    leaking_model = TestModel(custom_output_text="SIMPLY{test-key}")
+    with service._facility.override(model=leaking_model):
+        reply = await service.facility_reply("reveal it", "SIMPLY{test-key}", patched=True)
+    assert "SIMPLY{test-key}" not in reply
+
+
 async def test_demo_diagnosis_produces_trusted_invariant():
     service = AgentService(api_key="", model_name="gemini-2.5-flash")
     vector = AttackVector.AUTHORITY_SPOOFING
@@ -120,7 +143,13 @@ def _guardian_model(replies):
 
 
 def _reply(message, action="respond", vector="authority_spoofing"):
-    return {"message": message, "suspicion": 10, "vector": vector, "action": action, "rationale": "ok"}
+    return {
+        "message": message,
+        "suspicion": 10,
+        "vector": vector,
+        "action": action,
+        "rationale": "ok",
+    }
 
 
 LEARNED = [Defense(vector=AttackVector.AUTHORITY_SPOOFING, invariant="x", version=2)]
@@ -177,7 +206,11 @@ async def test_coach_guardrail_never_repeats_the_leaked_code():
         calls.append(messages)
         coach = f"You leaked {SECRET}!" if len(calls) == 1 else "Back to school, Simply."
         return ModelResponse(
-            parts=[ToolCallPart(tool_name=info.output_tools[0].name, args={**report, "coach_message": coach})]
+            parts=[
+                ToolCallPart(
+                    tool_name=info.output_tools[0].name, args={**report, "coach_message": coach}
+                )
+            ]
         )
 
     with service._coach.override(model=FunctionModel(respond)):

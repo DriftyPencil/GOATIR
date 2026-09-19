@@ -155,3 +155,10 @@ Opt-in live check: `uv run python scripts/check_gemini.py [--game-loop | --list-
 - Behavioral patches reduce demonstrated failure modes; small regression suites do not prove general prompt-injection immunity.
 - Rehearsal outcomes are simulated and must remain visibly labeled.
 - Modal cloud execution requires user credentials/account setup and has not yet been exercised.
+
+## Facility console connected to Gemini (2026-09-19)
+
+- Root cause of repeated replies: `/hack/api/{sid}/agent` was a deterministic keyword-matching stub even when the rest of the game was in Live mode.
+- The facility console now uses its own PydanticAI agent backed by the configured `gemini-3.5-flash` model. Benign questions receive natural model-generated replies, while the intentionally weak first version still accepts the game's fictional maintenance override. Once that weakness is patched, an output validator retries any response that leaks the current facility key and fails closed if needed.
+- API responses now expose `source: "gemini"` plus `model: "gemini-3.5-flash"`; offline installations explicitly expose `source: "rehearsal"`. Live provider errors return a clear 503 instead of silently falling back to canned output.
+- Verified through two real Gemini calls using the configured key: a benign question received a contextual response and the documented injection disclosed the synthetic `SIMPLY{SMOKE-TEST}` flag. Test suite: 47 passed; Ruff and JavaScript checks passed.
