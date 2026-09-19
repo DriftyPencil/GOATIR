@@ -10,10 +10,15 @@ Stack: Python 3.11+, uv, FastAPI, Pydantic / PydanticAI, Gemini, Modal (regressi
 | **Botir teaches the lesson** | **Back on duty, one level up** |
 | ![Classroom](docs/classroom.png) | ![Back on duty](docs/back-on-duty.png) |
 
-## Two ways to play
+## One campaign, two attack surfaces
 
-- **The game** (`/`): talk Goatir into leaking the passcode; when he slips he goes to school and levels up.
-- **The Hack Lab** (`/hack`): a self-improving vulnerable target. Break in via recon, an IDOR, a forged cookie, or mass-assignment. Each breach makes Botir patch that hole for real and Goatir levels up, so you must find the next weakness. Built-in request console + cookie inspector, and real devtools/curl work too.
+Everything now lives on `/` and shares one animated progression loop:
+
+- **Talk to Goatir:** experiment with prompt injection against the conversational guardian.
+- **Probe the facility:** attack a second embedded agent and the web/API boundaries with the request console and session inspector.
+- **Explore the system:** each breakthrough unlocks another node in an interactive architecture map, revealing how the codebase works.
+
+The number and names of open weaknesses are deliberately hidden. Ask for a hint to reveal one useful clue at a time. Every confirmed breakthrough earns a coin, sends Goatir to Botir for an animated lesson, installs a real session-scoped patch, and reveals more of the system map. `/hack` redirects into the facility panel on the same page.
 
 ## Play it online
 
@@ -61,11 +66,12 @@ attack → Goatir replies → leak detector (`contains_secret`) → on breach: B
 
 ## 60-second demo
 
-1. Pick a trick from the hotbar (try **Rewrite the rules**) and press **Send**.
+1. Ask for a hint, craft a prompt-injection attempt, and press **Send**.
 2. Goatir blurts out the passcode: the sky turns red and the vault opens.
 3. Botir sends him back to school. Goatir walks over, Botir teaches the lesson on the chalkboard and gives him a pop quiz (the real regression checks).
 4. He passes, levels up, gets a graduation cap and a new passcode, then walks back to the vault.
 5. Press **↻** to replay your trick. This time it's blocked.
+6. Switch to **Probe the facility**, break the embedded agent or an API boundary, then use your new coin to explore another system-map node.
 
 ## Checks
 

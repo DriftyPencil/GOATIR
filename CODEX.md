@@ -41,6 +41,17 @@ Last updated: 2026-09-19 (session 2). This file records implementation progress 
 - Added `README.md`. Added `[tool.logfire] ignore_no_config` to silence a test warning.
 - Default model changed from `gemini-2.5-flash` to `gemini-3.5-flash`. On 2026-09-19 the 2.5 model returned HTTP 404 for generateContent even though it still appears in the model list. `gemini-flash-latest` also works.
 
+## Unified campaign redesign (2026-09-19)
+
+- The conversation game, facility Hack Lab, and system explorer now live on one page. `/hack` redirects to `/#system`.
+- The persistent pixel world remains visible above all three views. Breaches on either attack surface trigger Goatir/Botir training animation and increase the shared displayed level.
+- Fixed attack hotbar and visible weakness totals were removed. Both surfaces now reveal progressive hints one at a time; the facility reports its weakness count as `unknown` and omits totals from its public state.
+- Added a facility-side prompt injection target (`POST /hack/api/{sid}/agent`) so prompt injection exists on both surfaces. Added trusted-header and verbose-error lab weaknesses as additional hidden attack paths.
+- Every unique breakthrough earns one coin. Coins from both surfaces combine in the HUD and unlock nodes in the interactive system map.
+- The system map progressively explains `static/app.js`, `vault/main.py`, `vault/agents.py`, `vault/policy.py`, `vault/engine.py`, `vault/evaluation.py`, `vault/facility.py`, and `vault/eval_worker.py`.
+- Browser QA confirmed: prompt hint 1 → prompt hint 2, facility agent injection → flag capture → breach → +1 coin / Lv2 → Botir patch animation → map expanded from 2/? to 3/?. Facility weakness count remained undisclosed.
+- Verification after redesign: 45 tests passed, Ruff clean, JavaScript syntax clean.
+
 ## API contract
 
 - `GET /api/health`: server liveness.

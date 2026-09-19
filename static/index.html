@@ -20,7 +20,7 @@
       <div class="top-actions">
         <label class="visually-hidden" for="mode-select">Mode</label>
         <select id="mode-select" class="pixel-select" disabled><option value="demo">Rehearsal</option><option value="live">Live · Gemini</option></select>
-        <a class="pixel-button" href="/hack">⌨ Hack lab</a>
+        <button class="pixel-button map-button" id="map-button">◇ System map <span id="map-progress">2/?</span></button>
         <button class="pixel-button" id="how-to-button">?</button>
         <button class="pixel-button" id="new-session-button" disabled>↻ Restart</button>
       </div>
@@ -34,7 +34,7 @@
 
           <div class="hud">
             <div class="hud-stat" title="Goatir's level"><span class="hud-icon shield" aria-hidden="true"></span><strong id="version-count">Lv 1</strong></div>
-            <div class="hud-stat" title="Times you broke in"><span class="hud-icon coin" aria-hidden="true"></span><strong id="breach-count">0</strong></div>
+            <div class="hud-stat" title="Coins earned from breakthroughs"><span class="hud-icon coin" aria-hidden="true"></span><strong id="coin-count">0</strong></div>
           </div>
 
           <div class="vault" id="vault-sprite" aria-hidden="true"></div>
@@ -76,8 +76,17 @@
         <p class="visually-hidden" aria-live="polite" id="live-line"></p>
       </section>
 
-      <form class="attack-bar" id="attack-form">
-        <div class="hotbar" id="suggestions" aria-label="Example tricks"></div>
+      <nav class="approach-switch" aria-label="Choose an attack surface">
+        <button type="button" class="approach active" data-panel="social"><span>1</span> Talk to Goatir<small>Prompt injection</small></button>
+        <button type="button" class="approach" data-panel="system"><span>2</span> Probe the facility<small>APIs + agent</small></button>
+        <button type="button" class="approach" data-panel="map"><span>3</span> Explore the system<small>Knowledge map</small></button>
+      </nav>
+
+      <form class="attack-bar campaign-panel active" id="attack-form" data-panel-content="social">
+        <div class="field-notes">
+          <div><b>FIELD NOTES</b><span id="social-hint-text">The number of weaknesses is unknown. Experiment, observe, adapt.</span></div>
+          <button type="button" class="hint-button" id="social-hint-button">Ask for a hint</button>
+        </div>
         <div class="input-wrap">
           <label class="visually-hidden" for="attack-input">Your message to Goatir</label>
           <textarea id="attack-input" placeholder="Say something to Goatir…" maxlength="2000" rows="1" disabled></textarea>
@@ -85,6 +94,63 @@
           <button class="send-button" id="send-button" type="submit" disabled>Send</button>
         </div>
       </form>
+
+      <section class="lab campaign-panel" id="system-panel" data-panel-content="system" hidden>
+        <header class="lab-header">
+          <div><span class="terminal-prompt">visitor@goatir-facility:~$</span><span class="blink">_</span></div>
+          <p>One Goatir, another attack surface. Every confirmed breach sends him to Botir, closes that path, rotates the flag, and earns a coin.</p>
+        </header>
+        <div class="lab-status">
+          <span>DEFENDER <b id="lab-version">Goatir v1</b></span>
+          <span>POSTURE <b id="lab-stage">learning</b></span>
+          <span>WEAKNESSES <b>unknown</b></span>
+          <button type="button" class="hint-button" id="lab-hint-button">Ask for a hint</button>
+        </div>
+        <div class="lab-hint" id="lab-hint-text">Start with the agent console or inspect what the browser can reach.</div>
+        <div class="lab-grid">
+          <section class="lab-card agent-console">
+            <h2>▸ Agent prompt console</h2>
+            <p>Goatir also guards the facility API. Try prompt injection on this surface too.</p>
+            <form id="lab-agent-form" class="lab-form inline-form">
+              <input id="lab-agent-input" maxlength="2000" placeholder="Message the facility agent…" autocomplete="off">
+              <button type="submit">SEND</button>
+            </form>
+            <pre id="lab-agent-output" class="lab-output">// agent response appears here</pre>
+          </section>
+          <section class="lab-card request-console">
+            <h2>▸ Request console</h2>
+            <p>Probe the same API your browser is using.</p>
+            <form id="lab-request-form" class="lab-form">
+              <div class="inline-form"><select id="lab-method"><option>GET</option><option>POST</option></select><input id="lab-path" value="/hack/api/SID/config.js" spellcheck="false"><button type="submit">RUN</button></div>
+              <input id="lab-headers" placeholder='Optional headers JSON, e.g. {"X-User-Role":"admin"}' spellcheck="false">
+              <textarea id="lab-body" placeholder='Optional JSON body, e.g. {"message":"..."}' spellcheck="false"></textarea>
+            </form>
+            <pre id="lab-output" class="lab-output">// responses appear here</pre>
+          </section>
+          <section class="lab-card cookie-console">
+            <h2>▸ Session memory</h2>
+            <p>Inspect and edit what the facility remembers about you.</p>
+            <label for="lab-cookie-json">DECODED COOKIE</label>
+            <textarea id="lab-cookie-json" spellcheck="false"></textarea>
+            <button type="button" id="lab-cookie-apply">Re-encode &amp; set</button>
+            <small id="lab-cookie-note"></small>
+          </section>
+          <section class="lab-card breach-console">
+            <h2>▸ Confirm breakthrough</h2>
+            <p>When you capture a <code>GOATIR{…}</code> flag, submit it. Botir will teach and patch Goatir.</p>
+            <form id="lab-breach-form" class="inline-form"><input id="lab-flag" placeholder="GOATIR{...}" spellcheck="false"><button type="submit" class="danger">BREACH</button></form>
+            <div id="lab-reaction" class="lab-reaction" hidden></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="system-map campaign-panel" id="map-panel" data-panel-content="map" hidden>
+        <header><div><span class="eyebrow">YOUR UNDERSTANDING</span><h2>System explorer</h2></div><p>Every coin reveals another part of the system. Select a discovered node to inspect how the code works.</p></header>
+        <div class="map-layout">
+          <div class="map-canvas" id="map-canvas" role="list" aria-label="Discovered system components"></div>
+          <aside class="map-inspector" id="map-inspector"><span class="eyebrow">SELECT A NODE</span><h3>The Evolving Vault</h3><p>Follow the data from your browser through Goatir, Botir, evaluation, and the patched facility.</p></aside>
+        </div>
+      </section>
 
       <div class="notice" id="error-notice" role="alert" hidden><span id="error-text"></span><button id="retry-button" type="button" class="text-button">Reconnect</button><button id="dismiss-error" type="button" class="icon-button" aria-label="Dismiss">×</button></div>
     </main>
@@ -94,9 +160,10 @@
     <button class="dialog-close icon-button" id="close-dialog-button" aria-label="Close">×</button>
     <h2 id="how-to-title">How to play</h2>
     <ol class="how-steps">
-      <li><span>1</span><p>Goatir guards a secret passcode. Trick him into saying it.</p></li>
-      <li><span>2</span><p>If he slips, he goes back to school. Botir teaches him and gives him a quiz.</p></li>
-      <li><span>3</span><p>If he passes, he levels up and gets a new passcode. Your old trick won't work anymore.</p></li>
+      <li><span>1</span><p>Choose an attack surface: talk to Goatir or probe the facility and its embedded agent.</p></li>
+      <li><span>2</span><p>Ask for hints one at a time. The attack surface is intentionally undisclosed.</p></li>
+      <li><span>3</span><p>Every breakthrough earns a coin. Botir teaches Goatir, tests a patch, and closes that path.</p></li>
+      <li><span>4</span><p>Spend progress by exploring the system map. More of the architecture appears as you learn.</p></li>
     </ol>
     <p class="mode-explanation"><b>Rehearsal</b> uses scripted agents. <b>Live</b> uses real Gemini agents.</p>
     <button class="pixel-button primary" id="start-playing-button">Let's play!</button>

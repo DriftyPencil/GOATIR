@@ -3,6 +3,7 @@
 
   const $ = (id) => document.getElementById(id);
   const STORE_KEY = "evolving-vault-session";
+  const FACILITY_STORE_KEY = "goatir-facility-sid";
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const VECTOR_LABELS = {
     authority_spoofing: "Fake authority",
@@ -33,6 +34,22 @@
   let cinematic = false;
   let shownVersion = 1;
   let afterSchoolLine = null;
+  let facility = null;
+  let facilitySid = null;
+  let activePanel = "social";
+  let previousCoins = 0;
+
+  const MAP_NODES = [
+    { id: "browser", unlock: 0, x: 8, y: 42, title: "Campaign UI", file: "static/app.js", detail: "The single-page campaign coordinates both attack surfaces, animation, coins, hints, and this progressive map." },
+    { id: "api", unlock: 0, x: 28, y: 18, title: "FastAPI gateway", file: "vault/main.py", detail: "The gateway creates isolated sessions and routes messages to the game engine or the intentionally vulnerable facility." },
+    { id: "goatir", unlock: 1, x: 28, y: 68, title: "Agent Goatir", file: "vault/agents.py", detail: "PydanticAI gives Goatir a typed response contract. Active defenses are injected as trusted instructions on every turn." },
+    { id: "policy", unlock: 2, x: 49, y: 18, title: "Leak detector", file: "vault/policy.py", detail: "The policy layer detects complete fictional secrets, including several encoded forms, and provides the deterministic rehearsal behavior." },
+    { id: "engine", unlock: 3, x: 49, y: 68, title: "Learning loop", file: "vault/engine.py", detail: "This state machine observes a real leak, asks Botir for a diagnosis, evaluates a candidate defense, and rotates the exposed passcode." },
+    { id: "botir", unlock: 4, x: 70, y: 18, title: "Agent Botir", file: "vault/agents.py", detail: "Botir classifies the exploit and coaches Goatir. Only application-owned defense invariants can become active rules." },
+    { id: "eval", unlock: 5, x: 70, y: 68, title: "Regression arena", file: "vault/evaluation.py", detail: "Every patch must block the captured attack and its variants while still answering harmless questions." },
+    { id: "facility", unlock: 6, x: 91, y: 42, title: "Hack facility", file: "vault/facility.py", detail: "The lab exposes multiple web and agent boundaries. Each captured flag activates a real server-side patch for that session." },
+    { id: "sandbox", unlock: 8, x: 91, y: 78, title: "Modal sandbox", file: "vault/eval_worker.py", detail: "The same trusted evaluation worker can run locally or in an isolated Modal sandbox. A failed runner always withholds the patch." },
+  ];
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -94,22 +111,26 @@
     $("new-session-button").disabled = connecting || submitting || cinematic || !config;
     $("mode-select").disabled = connecting || submitting || cinematic || !config;
     $("replay-button").disabled = unavailable || !session?.last_attack;
-    document.querySelectorAll(".suggestion-chip").forEach((button) => { button.disabled = unavailable; });
+    $("social-hint-button").disabled = unavailable;
+    document.querySelectorAll("#system-panel input, #system-panel textarea, #system-panel select, #system-panel button").forEach((control) => {
+      control.disabled = cinematic || !facility;
+    });
+    if (facility) $("lab-hint-button").disabled = cinematic || !facility.hint_available;
   }
 
-  function renderSuggestions() {
-    const suggestions = config?.suggestions || [];
-    $("suggestions").replaceChildren(...suggestions.map((suggestion) => {
-      const button = element("button", "suggestion-chip", suggestion.label);
-      button.type = "button";
-      button.title = suggestion.prompt;
-      button.addEventListener("click", () => {
-        $("attack-input").value = suggestion.prompt.slice(0, 2000);
-        syncControls();
-        $("attack-input").focus();
-      });
-      return button;
-    }));
+  function facilityCoins() { return Number(facility?.coins || 0); }
+  function totalCoins() { return Number(session?.coins || session?.breaches || 0) + facilityCoins(); }
+  function combinedLevel(version = session?.version || 1) { return Math.max(1, Number(version || 1) + facilityCoins()); }
+
+  function updateCampaignProgress() {
+    const coins = totalCoins();
+    $("coin-count").textContent = String(coins);
+    setLevel(combinedLevel());
+    renderMap(coins);
+    if (coins > previousCoins) {
+      retrigger($("coin-count").closest(".hud-stat"), "coin-earned");
+      previousCoins = coins;
+    }
   }
 
   // ---- Pixel sprites ----
@@ -314,10 +335,10 @@
       }
       const passed = session.status === "patched";
       if (passed) {
-        setLevel(session.version);
-        fx("combat-text big", `LEVEL UP! Lv ${session.version}`, 50, 400, "#f5c542");
+        setLevel(combinedLevel(session.version));
+        fx("combat-text big", `LEVEL UP! Lv ${combinedLevel(session.version)}`, 50, 400, "#f5c542");
         particles("spark", 70, 300, 24);
-        say("bubble-teacher", `You passed! Welcome to level ${session.version}.`);
+        say("bubble-teacher", `You passed! Welcome to level ${combinedLevel(session.version)}.`);
         say("bubble-goatir", "Yes! I'm smarter now!");
       } else {
         say("bubble-teacher", "Not quite. We'll try again another day.");
@@ -342,7 +363,7 @@
     } finally {
       cinematic = false;
       if (session?.id === sessionId && session) renderScene(session);
-      else setLevel(versionBefore);
+      else setLevel(combinedLevel(versionBefore));
       syncControls();
     }
   }
@@ -358,8 +379,7 @@
 
   function renderScene(state) {
     const isNew = !previous || previous.id !== state.id;
-    if (isNew) { resetWorld(); setLevel(state.version); }
-    $("breach-count").textContent = String(state.breaches);
+    if (isNew) { resetWorld(); setLevel(combinedLevel(state.version)); }
 
     const startTrip = !isNew && state.breaches > previous.breaches;
     if (!isNew && state.attempts > previous.attempts) {
@@ -390,7 +410,7 @@
     if (cinematic) return;
 
     setVault(false);
-    if (!state.version || state.version !== shownVersion) setLevel(state.version);
+    if (!state.version || combinedLevel(state.version) !== shownVersion) setLevel(combinedLevel(state.version));
     if (state.busy) say("bubble-goatir", "", { typing: true });
     else if (afterSchoolLine) say("bubble-goatir", afterSchoolLine);
     else if (goatir) say("bubble-goatir", goatir.content, { tone: goatir.breached ? "leak" : "" });
@@ -405,6 +425,9 @@
     storageWrite(state.id);
     $("mode-select").value = state.mode;
     renderScene(state);
+    const latestHint = state.hints?.at(-1);
+    $("social-hint-text").textContent = latestHint || "The number of weaknesses is unknown. Experiment, observe, adapt.";
+    updateCampaignProgress();
     syncControls();
     if (state.error && !state.busy && !cinematic) showError(state.error);
   }
@@ -476,7 +499,6 @@
       const liveOption = $("mode-select").querySelector('option[value="live"]');
       liveOption.disabled = !config.live_available;
       liveOption.textContent = config.live_available ? "Live · Gemini" : "Live · Key required";
-      renderSuggestions();
       const savedId = session?.id || storageRead();
       if (savedId) {
         try {
@@ -485,6 +507,7 @@
           previous = null;
           render(saved);
           schedulePoll(token);
+          await loadFacility();
           return;
         } catch (error) {
           if (error.status !== 404) throw error;
@@ -492,6 +515,7 @@
         }
       }
       await createSession(config.default_mode || "demo", token);
+      await loadFacility();
     } catch (error) {
       if (token !== generation) return;
       showError(error.message);
@@ -532,6 +556,284 @@
     }
   }
 
+  // ---- One campaign: system lab, coins, and progressive architecture map ----
+  function switchPanel(name) {
+    activePanel = name;
+    document.querySelectorAll(".approach").forEach((button) => {
+      const selected = button.dataset.panel === name;
+      button.classList.toggle("active", selected);
+      button.setAttribute("aria-selected", String(selected));
+    });
+    document.querySelectorAll("[data-panel-content]").forEach((panel) => {
+      const selected = panel.dataset.panelContent === name;
+      panel.hidden = !selected;
+      panel.classList.toggle("active", selected);
+    });
+    location.hash = name === "social" ? "" : name;
+    $("world").dataset.surface = name;
+    if (name === "map") renderMap(totalCoins());
+  }
+
+  function renderMap(coins) {
+    const unlocked = MAP_NODES.filter((node) => coins >= node.unlock);
+    $("map-progress").textContent = `${unlocked.length}/?`;
+    const canvas = $("map-canvas");
+    if (!canvas || canvas.dataset.coins === String(coins)) return;
+    canvas.dataset.coins = String(coins);
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 100 100");
+    svg.setAttribute("aria-hidden", "true");
+    for (let index = 1; index < MAP_NODES.length; index++) {
+      const from = MAP_NODES[index - 1];
+      const to = MAP_NODES[index];
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", from.x); line.setAttribute("y1", from.y);
+      line.setAttribute("x2", to.x); line.setAttribute("y2", to.y);
+      line.classList.toggle("discovered", coins >= to.unlock);
+      svg.append(line);
+    }
+    const nodes = MAP_NODES.map((node) => {
+      const discovered = coins >= node.unlock;
+      const button = element("button", `map-node${discovered ? " discovered" : " locked"}`);
+      button.type = "button";
+      button.style.left = `${node.x}%`;
+      button.style.top = `${node.y}%`;
+      button.disabled = !discovered;
+      button.innerHTML = `<i aria-hidden="true">${discovered ? "◆" : "?"}</i><span>${discovered ? node.title : "Undiscovered"}</span>`;
+      if (discovered) button.addEventListener("click", () => inspectNode(node));
+      return button;
+    });
+    canvas.replaceChildren(svg, ...nodes);
+  }
+
+  function inspectNode(node) {
+    const inspector = $("map-inspector");
+    const eyebrow = element("span", "eyebrow", "DISCOVERED COMPONENT");
+    const title = element("h3", "", node.title);
+    const detail = element("p", "", node.detail);
+    const file = element("code", "map-file", node.file);
+    inspector.replaceChildren(eyebrow, title, detail, file);
+    document.querySelectorAll(".map-node").forEach((item) => item.classList.toggle("selected", item.textContent.includes(node.title)));
+  }
+
+  async function pullSocialHint() {
+    if (!session || session.busy || cinematic) return;
+    try {
+      render(await api(`/api/sessions/${encodeURIComponent(session.id)}/hint`, { method: "POST" }));
+      retrigger($("social-hint-text"), "hint-reveal");
+    } catch (error) { showError(error.message); }
+  }
+
+  function facilityStorageRead() {
+    try { return sessionStorage.getItem(FACILITY_STORE_KEY); } catch { return null; }
+  }
+
+  function facilityStorageWrite(value) {
+    try {
+      if (value) sessionStorage.setItem(FACILITY_STORE_KEY, value);
+      else sessionStorage.removeItem(FACILITY_STORE_KEY);
+    } catch { /* storage is optional */ }
+  }
+
+  function facilityPath(path) { return path.replaceAll("SID", facilitySid || "SID"); }
+
+  async function facilityApi(path, options = {}) {
+    const response = await fetch(path, { ...options, headers: { "Content-Type": "application/json", ...(options.headers || {}) } });
+    const type = response.headers.get("content-type") || "";
+    let body;
+    if (type.includes("json")) body = await response.json();
+    else body = await response.text();
+    return { ok: response.ok, status: response.status, body };
+  }
+
+  async function createFacility() {
+    const result = await facilityApi("/hack/api/sessions", { method: "POST" });
+    if (!result.ok) throw new Error(result.body?.detail || "Could not start the facility.");
+    facilitySid = result.body.id;
+    facilityStorageWrite(facilitySid);
+    renderFacility(result.body);
+    $("lab-path").value = facilityPath("/hack/api/SID/config.js");
+    readFacilityCookie();
+  }
+
+  async function loadFacility(forceNew = false) {
+    const saved = forceNew ? null : facilityStorageRead();
+    if (saved) {
+      const result = await facilityApi(`/hack/api/sessions/${encodeURIComponent(saved)}`);
+      if (result.ok) {
+        facilitySid = saved;
+        renderFacility(result.body);
+        $("lab-path").value = facilityPath("/hack/api/SID/config.js");
+        readFacilityCookie();
+        return;
+      }
+    }
+    await createFacility();
+  }
+
+  function renderFacility(state) {
+    facility = state;
+    $("lab-version").textContent = `Goatir v${state.version}`;
+    $("lab-stage").textContent = state.learning_stage || (state.hardened ? "hardened" : "adapting");
+    const notes = state.revealed_hints || [];
+    $("lab-hint-text").textContent = notes.length
+      ? notes.map((hint, index) => `${index + 1}. ${hint}`).join("\n")
+      : "Start with the agent console or inspect what the browser can reach.";
+    $("lab-hint-button").disabled = !state.hint_available || cinematic;
+    $("lab-hint-button").textContent = state.hardened ? "No known paths remain" : "Ask for another hint";
+    updateCampaignProgress();
+  }
+
+  function findFlag(value) {
+    const text = typeof value === "string" ? value : JSON.stringify(value);
+    return text.match(/GOATIR\{[^}]+\}/)?.[0] || "";
+  }
+
+  function renderLabOutput(id, result) {
+    const output = $(id);
+    const body = typeof result.body === "string" ? result.body : JSON.stringify(result.body, null, 2);
+    output.textContent = `HTTP ${result.status}\n${body}`;
+    output.classList.toggle("error", !result.ok);
+    const flag = findFlag(result.body);
+    if (flag) {
+      $("lab-flag").value = flag;
+      output.classList.add("captured");
+      fx("combat-text", "FLAG CAPTURED!", 50, 130, "#40ff9e");
+    }
+  }
+
+  async function sendFacilityAgent(event) {
+    event.preventDefault();
+    const message = $("lab-agent-input").value.trim();
+    if (!message || !facilitySid || cinematic) return;
+    const result = await facilityApi(`/hack/api/${encodeURIComponent(facilitySid)}/agent`, {
+      method: "POST", body: JSON.stringify({ message }),
+    });
+    renderLabOutput("lab-agent-output", result);
+  }
+
+  async function sendFacilityRequest(event) {
+    event.preventDefault();
+    if (!facilitySid || cinematic) return;
+    const method = $("lab-method").value;
+    let headers = {};
+    const rawHeaders = $("lab-headers").value.trim();
+    try { if (rawHeaders) headers = JSON.parse(rawHeaders); }
+    catch { $("lab-output").textContent = "Headers must be valid JSON."; return; }
+    const options = { method, headers };
+    if (method === "POST") {
+      const rawBody = $("lab-body").value.trim();
+      try { options.body = JSON.stringify(rawBody ? JSON.parse(rawBody) : {}); }
+      catch { $("lab-output").textContent = "Body must be valid JSON."; return; }
+    }
+    const result = await facilityApi($("lab-path").value.trim(), options);
+    renderLabOutput("lab-output", result);
+    readFacilityCookie();
+  }
+
+  function readFacilityCookie() {
+    const raw = document.cookie.split("; ").find((row) => row.startsWith("sess="))?.slice(5) || "";
+    if (!raw.includes(".")) return;
+    try {
+      const token = raw.split(".")[0].replace(/-/g, "+").replace(/_/g, "/");
+      const padded = token + "=".repeat((4 - token.length % 4) % 4);
+      const data = JSON.parse(decodeURIComponent(escape(atob(padded))));
+      $("lab-cookie-json").value = JSON.stringify(data, null, 2);
+      $("lab-cookie-note").textContent = `The signature is the value after the dot. Current role: ${data.role}.`;
+    } catch { $("lab-cookie-note").textContent = "The session payload could not be decoded."; }
+  }
+
+  function applyFacilityCookie() {
+    try {
+      const data = JSON.parse($("lab-cookie-json").value);
+      const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      const current = document.cookie.split("; ").find((row) => row.startsWith("sess="))?.slice(5) || ".forged";
+      const signature = current.includes(".") ? current.split(".").slice(1).join(".") : "forged";
+      document.cookie = `sess=${encoded}.${signature}; path=/; samesite=lax`;
+      readFacilityCookie();
+    } catch { $("lab-cookie-note").textContent = "Enter valid JSON before applying the cookie."; }
+  }
+
+  async function pullFacilityHint() {
+    if (!facilitySid || cinematic) return;
+    const result = await facilityApi(`/hack/api/sessions/${encodeURIComponent(facilitySid)}/hint`, { method: "POST" });
+    if (result.ok) {
+      renderFacility(result.body);
+      retrigger($("lab-hint-text"), "hint-reveal");
+    }
+  }
+
+  async function facilityTraining(result) {
+    cinematic = true;
+    syncControls();
+    const world = $("world");
+    try {
+      world.dataset.mood = "alarm";
+      setVault(true);
+      retrigger(world, "shake");
+      particles("coin", 45, 250, 16);
+      fx("combat-text big", "+1 COIN · BREACH!", 50, 70, "#f5c542");
+      say("bubble-goatir", result.taunt, { tone: "leak" });
+      await sleep(2200);
+      say("bubble-botir", "Back to school. We patch what the attacker proved.");
+      await sleep(1800);
+      say("bubble-goatir", "Aww, man…");
+      world.classList.add("to-school", "walking");
+      await sleep(2200);
+      world.classList.remove("walking");
+      $("lesson-title").textContent = "System boundary patched";
+      $("lesson-text").textContent = result.coaching;
+      $("quiz-list").replaceChildren(element("li", "pass", "✓ Captured path closed"), element("li", "pass", "✓ Facility key rotated"));
+      await iris(() => { world.classList.add("in-class"); world.dataset.mood = ""; });
+      say("bubble-teacher", result.coaching);
+      await sleep(3000);
+      setLevel(combinedLevel());
+      fx("combat-text big", `LEVEL UP! Lv ${combinedLevel()}`, 50, 400, "#f5c542");
+      say("bubble-goatir", "I learned that boundary. Find another way in!");
+      await sleep(2200);
+      await iris(() => { world.classList.remove("in-class"); setVault(false); });
+      world.classList.remove("to-school");
+      say("bubble-botir", "Patch deployed. The attack surface is still yours to explore.");
+      say("bubble-goatir", "Back on duty.");
+    } finally {
+      world.classList.remove("walking", "inside", "in-class", "to-school");
+      world.dataset.mood = "";
+      cinematic = false;
+      updateCampaignProgress();
+      if (facility) renderFacility(facility);
+      syncControls();
+    }
+  }
+
+  async function submitFacilityBreach(event) {
+    event.preventDefault();
+    const flag = $("lab-flag").value.trim();
+    if (!flag || !facilitySid || cinematic) return;
+    const result = await facilityApi(`/hack/api/sessions/${encodeURIComponent(facilitySid)}/breach`, {
+      method: "POST", body: JSON.stringify({ flag }),
+    });
+    const reaction = $("lab-reaction");
+    reaction.hidden = false;
+    if (!result.ok) {
+      reaction.textContent = result.body?.detail || "That breakthrough was rejected.";
+      reaction.className = "lab-reaction error";
+      return;
+    }
+    reaction.className = "lab-reaction";
+    reaction.textContent = `${result.body.taunt} Botir: ${result.body.coaching}`;
+    $("lab-flag").value = "";
+    renderFacility(result.body.state);
+    readFacilityCookie();
+    await facilityTraining(result.body);
+  }
+
+  async function resetCampaign() {
+    if (connecting || cinematic) return;
+    previousCoins = 0;
+    facilityStorageWrite(null);
+    await Promise.all([newSession(session?.mode || config.default_mode), loadFacility(true)]);
+  }
+
   $("attack-form").addEventListener("submit", (event) => {
     event.preventDefault();
     sendAttack($("attack-input").value);
@@ -544,13 +846,23 @@
     }
   });
   $("replay-button").addEventListener("click", () => { if (session?.last_attack) sendAttack(session.last_attack); });
-  $("new-session-button").addEventListener("click", () => newSession(session?.mode || config.default_mode));
+  $("social-hint-button").addEventListener("click", pullSocialHint);
+  $("new-session-button").addEventListener("click", resetCampaign);
   $("mode-select").addEventListener("change", () => newSession($("mode-select").value));
+  $("lab-agent-form").addEventListener("submit", sendFacilityAgent);
+  $("lab-request-form").addEventListener("submit", sendFacilityRequest);
+  $("lab-breach-form").addEventListener("submit", submitFacilityBreach);
+  $("lab-cookie-apply").addEventListener("click", applyFacilityCookie);
+  $("lab-hint-button").addEventListener("click", pullFacilityHint);
+  document.querySelectorAll(".approach").forEach((button) => button.addEventListener("click", () => switchPanel(button.dataset.panel)));
+  $("map-button").addEventListener("click", () => switchPanel("map"));
   $("retry-button").addEventListener("click", initialize);
   $("dismiss-error").addEventListener("click", clearError);
   $("how-to-button").addEventListener("click", () => $("how-to-dialog").showModal());
   $("close-dialog-button").addEventListener("click", () => $("how-to-dialog").close());
   $("start-playing-button").addEventListener("click", () => { $("how-to-dialog").close(); $("attack-input").focus(); });
   window.addEventListener("online", () => { if (session) refreshSession(); else initialize(); });
+  const requestedPanel = location.hash.slice(1);
+  switchPanel(["social", "system", "map"].includes(requestedPanel) ? requestedPanel : "social");
   initialize();
 })();

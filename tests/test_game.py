@@ -127,3 +127,16 @@ def test_http_contract_validation_and_no_credentials(settings):
         assert client.post(f"{base}/attack", json={"message": "x" * 4001}).status_code == 422
         assert client.get("/api/sessions/missing").status_code == 404
         assert client.get(base).status_code == 200
+
+
+def test_hints_are_progressive_and_do_not_reveal_attack_surface_size(settings):
+    app = create_app(settings)
+    with TestClient(app) as client:
+        state = client.post("/api/sessions", json={"mode": "demo"}).json()
+        url = f"/api/sessions/{state['id']}/hint"
+        first = client.post(url).json()
+        second = client.post(url).json()
+        assert len(first["hints"]) == 1
+        assert len(second["hints"]) == 2
+        assert first["hints"][0] != second["hints"][1]
+        assert "total" not in second and "weakness" not in second

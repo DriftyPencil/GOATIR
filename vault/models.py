@@ -92,6 +92,8 @@ class SessionState(BaseModel):
     attempts: int = 0
     breaches: int = 0
     blocked: int = 0
+    coins: int = 0
+    hints: list[str] = Field(default_factory=list)
     messages: list[Message] = Field(default_factory=list)
     events: list[Event] = Field(default_factory=list)
     defenses: list[Defense] = Field(default_factory=list)
