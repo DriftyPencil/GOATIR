@@ -30,6 +30,7 @@ a{color:inherit;text-decoration:none}
 .brand-title em{font-style:normal;color:var(--gold)}
 .top-actions{display:flex;gap:8px}
 .pixel-button,.pixel-select{background:var(--panel-2);font:10px var(--pixel);padding:9px 12px;text-shadow:2px 2px 0 #000}
+a.pixel-button{display:inline-flex;align-items:center;text-decoration:none;color:var(--text)}
 .pixel-button:hover:enabled{background:var(--slot);color:var(--gold)}
 .pixel-select{appearance:none;cursor:pointer}
 .pixel-select option{background:var(--panel);font:18px var(--body)}

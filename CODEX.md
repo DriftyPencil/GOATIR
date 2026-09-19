@@ -104,6 +104,20 @@ Opt-in live check: `uv run python scripts/check_gemini.py [--game-loop | --list-
 - The guardrails also run inside the regression quiz, because the quiz uses the same `AgentService.reply`. The quiz therefore tests the defense as deployed (instructions plus guardrail).
 - Tests: 4 new tests use `FunctionModel`: a learned leak is retried, an unlearned leak still passes, persistent leaks fail closed, and the coach cannot repeat the code. 37 pass. Verified live on the deployed app: Pull rank → Lv 2 → Pull rank blocked. Retries show up in Logfire traces.
 
+## The Hack Lab: a self-improving vulnerable target (2026-09-19, session 6)
+
+- New feature at `/hack` (linked from the game header). Instead of one chat, players attack a real vulnerable web surface. Each successful breach makes Botir ship a REAL patch that closes that weakness server-side, the secret rotates so the flag is void, Goatir's version goes up, and a hint points to the next open weakness. Open-ended / "self-improving": difficulty rises as the easy holes close.
+- Backend: `vault/facility.py` (`FacilityEngine`, per-session state, `build_facility_router`). Wired in `vault/main.py` (page route `/hack` + router `/hack/api`). No LLM calls — deterministic, cheap, reliable.
+- Four planted, distinct, real weakness classes, each with progressive hints and a patch that actually enforces afterwards:
+  1. `debug_endpoint` (easy): client `config.js` leaks a hidden `/_debug?diag=full` that dumps the flag. Patch → 403 without an internal token.
+  2. `idor` (easy): `GET /records/1` (admin) exposes the flag; you are record 2. Patch → ownership check, 403.
+  3. `cookie_forgery` (med): unsigned base64 `sess` cookie; flip `role` to admin → `/vault`. Patch → HMAC-signed cookies verified; forged rejected. The cookie even carries a fake signature to bait the classic mistake.
+  4. `mass_assignment` (hard): `POST /profile {"role":"admin"}` makes the server sign an admin cookie (beats the now-verified signature). Patch → server ignores client role.
+  - The vault distinguishes forgery vs mass-assignment by signature validity, so the layers stack correctly (mass-assignment still works after cookie-forgery is patched).
+- Frontend `static/hack/` (terminal/green theme, own aesthetic, not the pixel game): a built-in **Request Console** (craft/replay any HTTP call), a **Cookie/Memory Inspector** (decode, tamper, re-encode, set), progressive **Intel** hints, a **Submit Breakthrough** box (captured flags auto-fill), Goatir/Botir reactions, and a **Defender Log**. Real devtools/curl work identically — the console is a convenience, not a requirement.
+- Tests: `tests/test_facility.py` (5) exploit each weakness via TestClient and assert the patch then closes it, plus hints/hardened state. 42 tests pass, ruff clean.
+- Verified in-browser: full chain v1→v5 to 100% hardened, patched endpoints return 403, flags auto-capture, no console errors, no mobile overflow (375px).
+
 ## Remaining work
 
 1. Modal backend is still not exercised. It needs `uv run modal setup` and `EVAL_BACKEND=modal`.

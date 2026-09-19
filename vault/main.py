@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from vault.config import ROOT, Settings
 from vault.engine import GameEngine
+from vault.facility import FacilityEngine, build_facility_router
 from vault.models import SessionState
 
 
@@ -134,6 +135,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def index():
         return FileResponse(ROOT / "static" / "index.html")
 
+    @app.get("/hack")
+    async def facility_home():
+        return FileResponse(ROOT / "static" / "hack" / "index.html")
+
+    app.include_router(build_facility_router(FacilityEngine()))
     app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
     return app
 

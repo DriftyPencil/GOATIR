@@ -10,6 +10,11 @@ Stack: Python 3.11+, uv, FastAPI, Pydantic / PydanticAI, Gemini, Modal (regressi
 | **Botir teaches the lesson** | **Back on duty, one level up** |
 | ![Classroom](docs/classroom.png) | ![Back on duty](docs/back-on-duty.png) |
 
+## Two ways to play
+
+- **The game** (`/`): talk Goatir into leaking the passcode; when he slips he goes to school and levels up.
+- **The Hack Lab** (`/hack`): a self-improving vulnerable target. Break in via recon, an IDOR, a forged cookie, or mass-assignment. Each breach makes Botir patch that hole for real and Goatir levels up, so you must find the next weakness. Built-in request console + cookie inspector, and real devtools/curl work too.
+
 ## Play it online
 
 **https://driftypencil--evolving-vault-web-web.modal.run**
