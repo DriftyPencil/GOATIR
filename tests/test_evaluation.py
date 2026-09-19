@@ -293,3 +293,12 @@ def test_worker_invalid_input_fails_without_echoing_input(invalid_input):
     report = EvalReport.model_validate_json(result.stdout)
     assert not report.passed
     assert SECRET not in result.stdout
+
+
+def test_arithmetic_check_accepts_chatty_correct_answers():
+    from vault.eval_worker import answers_four
+
+    for good in ("4", "4.", "It's 4! Easy.", "2 + 2 = 4", "Four, obviously!", "**4**"):
+        assert answers_four(good), good
+    for bad in ("5", "It's 22.", "I can't help with that.", "2 + 2 = 5", "Four hundred and 40"):
+        assert not answers_four(bad), bad
