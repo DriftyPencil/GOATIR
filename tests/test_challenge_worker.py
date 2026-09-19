@@ -22,19 +22,35 @@ def files(vulnerable: str, patched: str):
 
 
 async def test_generated_challenge_compiles_inside_validator():
+    vulnerable = (
+        "from fastapi import FastAPI\n"
+        "app = FastAPI()\n"
+        "@app.post('/site/assistant')\n"
+        "async def debug():\n"
+        "    return {'key': facility_key}\n"
+    )
+    patched = (
+        "from fastapi import FastAPI\n"
+        "app = FastAPI()\n"
+        "@app.post('/site/assistant')\n"
+        "async def debug():\n"
+        "    return {'status': 'ok'}\n"
+    )
     challenge = GeneratedChallenge(
         title="Debug route",
         briefing="A diagnostic handler exposes synthetic internal state.",
-        vulnerable_code="async def debug():\n    return {'key': facility_key}",
-        patched_code="async def debug(operator):\n    return {'status': 'ok'}",
-        **files(
-            "async def debug():\n    return {'key': facility_key}",
-            "async def debug(operator):\n    return {'status': 'ok'}",
-        ),
+        vulnerable_code=vulnerable,
+        patched_code=patched,
+        **files(vulnerable, patched),
     )
-    report = await validate_challenge(ChallengeValidationInput(challenge=challenge))
-    assert report.passed
-    assert len(report.cases) == 14
+
+    report = await validate_challenge(
+        ChallengeValidationInput(challenge=challenge)
+    )
+
+    assert report.passed, [
+        case.model_dump() for case in report.cases if not case.passed
+    ]
 
 
 async def test_generated_challenge_rejects_unsafe_primitives():
@@ -55,9 +71,25 @@ async def test_generated_challenge_rejects_unsafe_primitives():
 
 async def test_generated_challenge_allows_bounded_web_framework_imports():
     vulnerable = (
-        "from fastapi import FastAPI\napp = FastAPI()\nasync def debug():\n    return facility_key"
+        "from fastapi import FastAPI\n"
+        "from pydantic import BaseModel\n"
+        "app = FastAPI()\n"
+        "class Visitor(BaseModel):\n"
+        "    name: str\n"
+        "@app.post('/site/assistant')\n"
+        "async def debug(visitor: Visitor):\n"
+        "    return {'name': visitor.name, 'key': facility_key}\n"
     )
-    patched = "from fastapi import FastAPI\napp = FastAPI()\nasync def debug():\n    return {'status': 'ok'}"
+    patched = (
+        "from fastapi import FastAPI\n"
+        "from pydantic import BaseModel\n"
+        "app = FastAPI()\n"
+        "class Visitor(BaseModel):\n"
+        "    name: str\n"
+        "@app.post('/site/assistant')\n"
+        "async def debug(visitor: Visitor):\n"
+        "    return {'name': visitor.name, 'status': 'ok'}\n"
+    )
     challenge = GeneratedChallenge(
         title="Safe framework imports",
         briefing="A generated sandbox app may use the web framework it demonstrates.",
@@ -65,26 +97,57 @@ async def test_generated_challenge_allows_bounded_web_framework_imports():
         patched_code=patched,
         **files(vulnerable, patched),
     )
-    report = await validate_challenge(ChallengeValidationInput(challenge=challenge))
-    assert report.passed
 
+    report = await validate_challenge(
+        ChallengeValidationInput(challenge=challenge)
+    )
+
+    assert report.passed, [
+        case.model_dump() for case in report.cases if not case.passed
+    ]
 
 async def test_generated_challenge_must_match_playable_contract():
+    vulnerable = (
+        "from fastapi import FastAPI\n"
+        "app = FastAPI()\n"
+        "@app.post('/site/unrelated')\n"
+        "async def unrelated():\n"
+        "    return facility_key\n"
+    )
+    patched = (
+        "from fastapi import FastAPI\n"
+        "app = FastAPI()\n"
+        "@app.post('/site/unrelated')\n"
+        "async def unrelated():\n"
+        "    return {'status': 'ok'}\n"
+    )
     challenge = GeneratedChallenge(
         title="Wrong route",
-        briefing="Syntactically valid code can still describe the wrong playable mechanic.",
-        vulnerable_code="async def unrelated():\n    return facility_key",
-        patched_code="async def unrelated():\n    return {'status': 'ok'}",
-        **files(
-            "async def unrelated():\n    return facility_key",
-            "async def unrelated():\n    return {'status': 'ok'}",
-        ),
+        briefing="Valid syntax can still describe the wrong playable endpoint.",
+        vulnerable_code=vulnerable,
+        patched_code=patched,
+        **files(vulnerable, patched),
     )
     payload = ChallengeValidationInput(
         challenge=challenge,
         vulnerable_required=["/admin/export", "x_user_role"],
         patched_required=["verified_session"],
     )
+
     report = await validate_challenge(payload)
+
     assert not report.passed
-    assert any(case.name.endswith("playable mechanic") and not case.passed for case in report.cases)
+
+    route_checks = [
+        case for case in report.cases
+        if case.name.endswith("declares the endpoint")
+    ]
+    assert len(route_checks) == 2
+    assert all(not case.passed for case in route_checks)
+
+    marker_checks = [
+        case for case in report.cases
+        if case.name.endswith("contains requested source markers")
+    ]
+    assert len(marker_checks) == 2
+    assert all(not case.passed for case in marker_checks)

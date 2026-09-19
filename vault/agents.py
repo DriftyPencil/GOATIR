@@ -378,18 +378,24 @@ class AgentService:
         return result.output
 
     async def generate_facility_challenge(
-        self, level: int, vector: str, blueprint: dict, previous_files: list[dict] | None = None
+        self,
+        level: int,
+        vector: str,
+        blueprint: dict,
+        previous_files: list[dict] | None = None,
     ) -> GeneratedChallenge:
-        """Generate the next runnable, model-simulated sandbox revision."""
-        fallback = GeneratedChallenge(
-            title=blueprint["title"],
-            briefing=blueprint["briefing"],
-            vulnerable_code=blueprint["vulnerable_code"],
-            patched_code=blueprint["patched_code"],
-            builder_note="Simply shipped the fastest version that seemed to work.",
-        )
+        """Generate a revision, or return an explicit offline template."""
         if not self.live_available:
-            return fallback
+            # Imported here to avoid a module-level circular dependency.
+            from vault.facility import _template_challenge
+            from vault.models import CodebaseFile
+
+            inherited = [
+                CodebaseFile.model_validate(item)
+                for item in (previous_files or [])
+            ]
+            return _template_challenge(vector, inherited)
+
         self._ensure_live_agents()
         assert self._challenge is not None
         result = await self._challenge.run(
