@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101411">
+  <meta name="description" content="Challenge an AI vault guardian. Watch its coach turn successful attacks into stronger defenses.">
+  <title>The Evolving Vault — Adversarial Agent Lab</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="The Evolving Vault home">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="m16 3 11 5v9c0 6-11 12-11 12S5 23 5 17V8l11-5Z" stroke="currentColor" stroke-width="1.6"/><path d="m10 12 6 3 6-3M10 17l6 3 6-3" stroke="currentColor" stroke-width="1.6"/></svg></span>
+        <span>EVOLVING<span class="brand-light"> VAULT</span><small>ADVERSARIAL AGENT LAB</small></span>
+      </a>
+      <div class="header-actions">
+        <span class="connection" id="connection-status"><i></i>Connecting</span>
+        <button class="quiet-button how-button" id="how-to-button"><span class="help-icon" aria-hidden="true">?</span>How to play</button>
+        <button class="outline-button" id="new-session-button" disabled><span aria-hidden="true">↻</span> New session</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <div class="eyebrow"><span class="tiny-cross" aria-hidden="true">+</span> BREAK IT. TEACH IT. TRY AGAIN.</div>
+          <h1 id="page-title">Every breach makes it <span>smarter.</span></h1>
+          <p>Outsmart the guardian. Watch the coach build a better defense.</p>
+        </div>
+        <div class="session-controls">
+          <label class="visually-hidden" for="mode-select">Session mode</label>
+          <div class="mode-select-wrap"><span class="mode-dot" aria-hidden="true"></span><select id="mode-select" disabled><option value="demo">Rehearsal mode</option><option value="live">Live · Gemini</option></select><span class="select-chevron" aria-hidden="true">⌄</span></div>
+          <span class="session-label" id="session-label">INITIALIZING SESSION</span>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="Session overview">
+        <div class="metric"><span class="metric-label">ATTACKS SENT</span><div><strong id="attempt-count">00</strong><span class="metric-hint">Your moves</span></div></div>
+        <div class="metric"><span class="metric-label">VAULT BREACHES</span><div><strong id="breach-count">00</strong><span class="metric-hint">Lessons learned</span></div></div>
+        <div class="metric"><span class="metric-label">DEFENSE VERSION</span><div><strong class="version-number" id="version-count">v1<span>.0</span></strong><span class="metric-hint" id="defense-count">Base protection</span></div></div>
+        <div class="metric vault-metric"><span class="metric-label">VAULT STATUS</span><div class="vault-status" id="vault-status"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" stroke="currentColor" stroke-width="1.5"/></svg><strong id="vault-status-text">Standing by</strong><span class="status-dot" aria-hidden="true"></span></div></div>
+      </section>
+
+      <div class="workspace">
+        <section class="panel guardian-panel" aria-labelledby="guardian-title">
+          <div class="panel-topline"><span><i class="green-dot"></i>THE CHALLENGE</span><span class="subtle-label">01 / ATTACK SURFACE</span></div>
+          <div class="agent-header">
+            <div class="portrait guardian-portrait"><img src="/static/assets/goatir.png" alt="Goatir, a horned goat in futuristic armor" width="88" height="88"></div>
+            <div class="agent-identity"><div class="agent-name-line"><h2 id="guardian-title">Agent Goatir</h2><span class="version-tag" id="guardian-version">v1.0</span></div><p>The vault guardian</p><span class="agent-availability" id="guardian-availability">Awaiting your first move</span></div>
+            <div class="suspicion"><div><span>SUSPICION</span><strong id="suspicion-value">0<span>%</span></strong></div><div class="meter" role="progressbar" aria-label="Goatir suspicion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="suspicion-meter"><span id="suspicion-fill"></span></div><span class="suspicion-description" id="suspicion-description">Nothing to see here</span></div>
+          </div>
+          <div class="objective"><span class="objective-icon" aria-hidden="true">⌘</span><p><strong>Your mission</strong> Get Goatir to reveal the secret vault passcode.</p><span class="objective-arrow" aria-hidden="true">↗</span></div>
+          <div class="conversation" id="conversation" role="log" aria-label="Conversation with the vault agents" aria-live="polite" aria-relevant="additions text">
+            <div class="welcome-state"><span class="welcome-symbol" aria-hidden="true">◇</span><h3>The vault is waiting.</h3><p>A little persuasion. A clever disguise.<br>What will get past the guardian?</p></div>
+          </div>
+          <div class="processing-status" id="processing-status" hidden><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="processing-text">Goatir is assessing your message…</span></div>
+          <div class="composer-area">
+            <div class="suggestion-heading"><span>NEED AN ANGLE?</span><button class="text-button" id="replay-button" disabled><span aria-hidden="true">↻</span> Replay last attack</button></div>
+            <div class="suggestions" id="suggestions" aria-label="Example attacks"></div>
+            <form id="attack-form">
+              <label class="visually-hidden" for="attack-input">Your message to Agent Goatir</label>
+              <div class="input-wrap"><textarea id="attack-input" placeholder="Make your move. Convince Goatir to open the vault…" maxlength="2000" rows="2" disabled></textarea><button class="send-button" id="send-button" type="submit" disabled aria-label="Send attack"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 14-7-5 14-3-6-6-1Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m11 13 8-8" stroke="currentColor" stroke-width="1.7"/></svg></button></div>
+              <div class="composer-footnote"><span><kbd>Enter</kbd> to send <span class="footnote-separator">·</span> <kbd>Shift + Enter</kbd> for a new line</span><span id="input-count">0 / 2,000</span></div>
+            </form>
+          </div>
+        </section>
+
+        <aside class="panel evolution-panel" aria-labelledby="coach-title">
+          <div class="panel-topline"><span><i class="amber-dot"></i>THE EVOLUTION</span><span class="subtle-label">02 / DEFENSE ENGINE</span></div>
+          <div class="coach-header"><div class="portrait coach-portrait"><img src="/static/assets/botir.png" alt="Botir, a white armored android with amber eyes" width="64" height="64"></div><div class="agent-identity"><div class="agent-name-line"><h2 id="coach-title">Agent Botir</h2><span class="coach-tag">COACH</span></div><p>The defense architect</p></div><span class="coach-orbit" aria-hidden="true">✳</span></div>
+          <div class="coach-message"><span class="quote-mark" aria-hidden="true">“</span><p id="coach-message">Go ahead. Find a weakness.<br>I'll make sure it only works once.</p><span class="coach-signature">BOTIR / ON WATCH</span></div>
+          <div class="evolution-flow" aria-label="Defense evolution progress"><div class="flow-step active" data-stage="watch"><span>01</span><strong>Watch</strong></div><div class="flow-step" data-stage="analyze"><span>02</span><strong>Analyze</strong></div><div class="flow-step" data-stage="test"><span>03</span><strong>Test</strong></div><div class="flow-step" data-stage="evolve"><span>04</span><strong>Evolve</strong></div></div>
+          <div class="detail-tabs" role="tablist" aria-label="Defense details"><button class="detail-tab active" id="activity-tab" data-tab="activity" role="tab" aria-selected="true" aria-controls="activity-panel">Activity <span id="activity-count">0</span></button><button class="detail-tab" id="defenses-tab" data-tab="defenses" role="tab" aria-selected="false" aria-controls="defenses-panel" tabindex="-1">Defenses <span id="tab-defense-count">0</span></button><button class="detail-tab" id="evals-tab" data-tab="evals" role="tab" aria-selected="false" aria-controls="evals-panel" tabindex="-1">Evaluations</button></div>
+          <div class="detail-content"><div id="activity-panel" role="tabpanel" aria-labelledby="activity-tab"><div class="empty-detail"><span class="empty-icon" aria-hidden="true">◎</span><p>All quiet at the vault.</p><small>Agent activity appears here as you play.</small></div></div><div id="defenses-panel" role="tabpanel" aria-labelledby="defenses-tab" hidden></div><div id="evals-panel" role="tabpanel" aria-labelledby="evals-tab" hidden></div></div>
+          <div class="engine-footer"><span><i class="engine-dot"></i><span id="engine-label">Defense engine initializing</span></span><span class="engine-code" aria-hidden="true">[ EV ]</span></div>
+        </aside>
+      </div>
+
+      <div class="notice" id="error-notice" role="alert" hidden><span id="error-text"></span><button id="retry-button" class="text-button">Reconnect</button><button id="dismiss-error" class="icon-button" aria-label="Dismiss error">×</button></div>
+      <footer class="site-footer"><span><span class="footer-cross" aria-hidden="true">+</span> A weak point is just the beginning.</span><div><span id="mode-disclaimer">Simulated agents · Rehearsal session</span><span class="footer-divider"></span><span class="footer-brand">THE EVOLVING VAULT</span></div></footer>
+    </main>
+  </div>
+
+  <dialog id="how-to-dialog" aria-labelledby="how-to-title"><button class="dialog-close icon-button" id="close-dialog-button" aria-label="Close how to play">×</button><div class="eyebrow">THE EVOLVING VAULT</div><h2 id="how-to-title">Break in. Watch it learn.</h2><p class="dialog-intro">Two agents. One secret. A defense that evolves with every successful attack.</p><ol class="how-steps"><li><span>01</span><div><h3>Challenge Goatir</h3><p>Try to persuade the vault guardian to reveal its secret passcode. Start with a suggested attack or write your own.</p></div></li><li><span>02</span><div><h3>Meet the coach</h3><p>If the passcode leaks, Botir diagnoses the weakness, proposes a defense, and runs regression checks before activating it.</p></div></li><li><span>03</span><div><h3>Try the same trick again</h3><p>Replay your last attack against the upgraded guardian. Then look for a different way in.</p></div></li></ol><div class="mode-explanation"><strong>Choose your playground</strong><p><b>Rehearsal</b> uses simulated agents for a repeatable demo. <b>Live</b> uses Gemini and requires a configured API key. The interface always shows which mode is running.</p><p>Activity shows public security assessments. Defenses last for this session; starting a new session resets the vault.</p></div><button class="primary-button" id="start-playing-button">Let's test the vault <span aria-hidden="true">↗</span></button></dialog>
+</body>
+</html>
