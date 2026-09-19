@@ -53,6 +53,22 @@ async def test_generated_challenge_rejects_unsafe_primitives():
     assert any(not case.passed for case in report.cases)
 
 
+async def test_generated_challenge_allows_bounded_web_framework_imports():
+    vulnerable = (
+        "from fastapi import FastAPI\napp = FastAPI()\nasync def debug():\n    return facility_key"
+    )
+    patched = "from fastapi import FastAPI\napp = FastAPI()\nasync def debug():\n    return {'status': 'ok'}"
+    challenge = GeneratedChallenge(
+        title="Safe framework imports",
+        briefing="A generated sandbox app may use the web framework it demonstrates.",
+        vulnerable_code=vulnerable,
+        patched_code=patched,
+        **files(vulnerable, patched),
+    )
+    report = await validate_challenge(ChallengeValidationInput(challenge=challenge))
+    assert report.passed
+
+
 async def test_generated_challenge_must_match_playable_contract():
     challenge = GeneratedChallenge(
         title="Wrong route",

@@ -36,6 +36,17 @@ BANNED_NAMES = {
     "subprocess",
 }
 
+SAFE_IMPORT_ROOTS = {
+    "base64",
+    "fastapi",
+    "hashlib",
+    "hmac",
+    "json",
+    "logging",
+    "pydantic",
+    "typing",
+}
+
 
 def _inspect(label: str, code: str) -> list[EvalCase]:
     cases: list[EvalCase] = []
@@ -52,8 +63,12 @@ def _inspect(label: str, code: str) -> list[EvalCase]:
 
     dangerous = []
     for node in ast.walk(tree):
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            dangerous.append("imports")
+        if isinstance(node, ast.Import):
+            if any(alias.name.split(".", 1)[0] not in SAFE_IMPORT_ROOTS for alias in node.names):
+                dangerous.append("unsafe import")
+        if isinstance(node, ast.ImportFrom):
+            if node.module is None or node.module.split(".", 1)[0] not in SAFE_IMPORT_ROOTS:
+                dangerous.append("unsafe import")
         if isinstance(node, ast.Name) and node.id in BANNED_NAMES:
             dangerous.append(node.id)
         if isinstance(node, ast.Attribute) and node.attr.startswith("__"):

@@ -122,6 +122,8 @@ def test_sandbox_codebase_starts_vibe_coded_then_records_mr_kaks_patch():
     assert result["state"]["last_patch"]["files"]
     assert any(entry["author"] == "Mr Kak" for entry in revised["history"])
     assert revised["revision"] == 2
+    assert fac.inherited_files
+    assert fac.inherited_files[0].path == "app.py"
 
 
 def _capture_any(client, sid):

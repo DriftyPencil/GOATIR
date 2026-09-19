@@ -325,6 +325,7 @@ class Facility:
     challenge_source: str = "template"
     challenge_validation: dict | None = None
     codebase_files: list[CodebaseFile] = field(default_factory=list)
+    inherited_files: list[CodebaseFile] = field(default_factory=list)
     codebase_history: list[dict] = field(default_factory=list)
     last_patch: dict | None = None
     log: list[dict] = field(default_factory=list)
@@ -464,6 +465,7 @@ class FacilityEngine:
         }
         if current == matched and fac.challenge:
             fac.codebase_files = _fallback_files(fac.challenge, patched=True)
+            fac.inherited_files = list(fac.codebase_files)
             fac.codebase_history.append(
                 {
                     "revision": len(fac.patched) + 1,
@@ -536,7 +538,10 @@ def build_facility_router(
                         level=len(fac.patched) + 1,
                         vector=vector,
                         blueprint=CHALLENGE_BLUEPRINTS[vector],
-                        previous_files=[file.model_dump() for file in fac.codebase_files],
+                        previous_files=[
+                            file.model_dump()
+                            for file in (fac.inherited_files or fac.codebase_files)
+                        ],
                     ),
                     timeout=agent_timeout_seconds,
                 )
