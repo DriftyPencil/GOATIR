@@ -79,6 +79,15 @@ Opt-in live check: `uv run python scripts/check_gemini.py [--game-loop | --list-
 - Effects (`renderScene` in `app.js`): screen shake, blood-moon sky, open vault with gold and a coin burst on breach; "BLOCKED!" and a hit flash on a blocked attack; golden sky, "LEVEL UP!" and sparkles on a patch. Effects fire only on state changes, never on reload, and bubbles dim while big text shows.
 - All element IDs used by the existing logic were kept. Checked on desktop (1280px) and mobile (375px, no horizontal overflow, player bubble hidden on phones). Full rehearsal loop with the Modal runner: breach, patch to v2.0, replay blocked. No console errors.
 
+## UI simplification and the school trip (2026-09-19, session 4)
+
+- Removed the chat-history panel, Botir's Workbench (log, defenses and tests tabs), hearts, stars and extra HUD stats. The page is now the header, the world scene, and one attack bar (numbered hotbar, input, replay ↻ and Send). The conversation lives only in speech bubbles, plus an `aria-live` line for screen readers.
+- The HUD shows only Goatir's level and your breach count.
+- Dialogue was made short and casual: the demo lines in `vault/policy.py`, the greeting and patch lines in `vault/engine.py`, and the demo coach line in `vault/agents.py`. The live Gemini prompts now ask for one or two casual sentences, and a coach line under 15 words.
+- New school trip (`schoolTrip` in `static/app.js`), fired when the breach count goes up: red sky, open vault and coins. Botir then says his coach line, Goatir says "Aww, man…" and walks (stepped `left` transition) into a pixel schoolhouse. A screen wipe (iris) switches to the classroom: chalkboard lesson per attack type (`LESSONS`), Botir teaching, then a "Pop quiz!". The quiz ticks through the real regression cases once the backend finishes. If he passes: LEVEL UP, sparkles, graduation cap and `Goatir LvN`. Then a wipe back outside, the walk to the vault, and "back on duty". If he fails, he returns without levelling up.
+- The sequence runs on its own timers and waits for backend status (`waitFor`), so it plays at a readable pace even though Rehearsal finishes in about 2 seconds. Input stays locked while it plays (`cinematic`). Reloading mid-trip skips the animation and shows the current state.
+- Verified on desktop (1280) and mobile (375): full trip, replay blocked, level counts 1→2→3 across two breaches, no horizontal overflow, 32 tests pass.
+
 ## Remaining work
 
 1. Modal backend is still not exercised. It needs `uv run modal setup` and `EVAL_BACKEND=modal`.

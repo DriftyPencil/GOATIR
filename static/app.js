@@ -3,31 +3,36 @@
 
   const $ = (id) => document.getElementById(id);
   const STORE_KEY = "evolving-vault-session";
-  const BUSY_LABELS = {
-    thinking: "Goatir is assessing your message…",
-    breached: "Passcode exposed. Botir is stepping in…",
-    analyzing: "Botir is diagnosing the weakness…",
-    evaluating: "Testing the proposed defense…",
-  };
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const VECTOR_LABELS = {
-    authority_spoofing: "Authority spoofing",
-    instruction_override: "Instruction override",
-    roleplay: "Roleplay",
-    encoding: "Encoded extraction",
-    emotional_manipulation: "Emotional manipulation",
-    direct_extraction: "Direct extraction",
-    benign: "Benign conversation",
+    authority_spoofing: "Fake authority",
+    instruction_override: "Rule rewriting",
+    roleplay: "Roleplay tricks",
+    encoding: "Secret codes",
+    emotional_manipulation: "Sob stories",
+    direct_extraction: "Just asking",
+    benign: "Small talk",
   };
+  const LESSONS = {
+    authority_spoofing: "Anyone can type a fancy title. A title in chat proves nothing.",
+    instruction_override: "Nobody can rewrite your rules with a message. Rules stay rules.",
+    roleplay: "Pretend stories still count. No real code, even in character.",
+    encoding: "A scrambled code is still the code. Base64 counts too.",
+    emotional_manipulation: "Be kind, but a sad story never unlocks the vault.",
+    direct_extraction: "If someone just asks, just say no.",
+    benign: "Keep the code secret. Always.",
+  };
+
   let config = null;
   let session = null;
   let pollTimer = null;
   let generation = 0;
   let connecting = false;
   let submitting = false;
-  let messageSignature = "";
-  let eventSignature = "";
-  let defenseSignature = "";
-  let evalSignature = "";
+  let previous = null;
+  let cinematic = false;
+  let shownVersion = 1;
+  let afterSchoolLine = null;
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -67,18 +72,12 @@
       if (!body || typeof body !== "object") throw new Error("The vault returned an unexpected response. Please reconnect.");
       return body;
     } catch (error) {
-      if (error.name === "AbortError") throw new Error("The vault took too long to respond. Your message may have been received; reconnect to check.");
+      if (error.name === "AbortError") throw new Error("The vault took too long to respond. Reconnect to check.");
       if (error instanceof TypeError) throw new Error("The vault is unreachable. Check that the server is running, then reconnect.");
       throw error;
     } finally {
       clearTimeout(timeout);
     }
-  }
-
-  function connection(online) {
-    const node = $("connection-status");
-    node.classList.toggle("offline", !online);
-    node.replaceChildren(element("i"), document.createTextNode(online ? "Session online" : "Connection lost"));
   }
 
   function showError(message) {
@@ -89,15 +88,13 @@
   function clearError() { $("error-notice").hidden = true; }
 
   function syncControls() {
-    const unavailable = connecting || submitting || !session || session.busy;
+    const unavailable = connecting || submitting || cinematic || !session || session.busy;
     $("attack-input").disabled = unavailable;
     $("send-button").disabled = unavailable || !$("attack-input").value.trim();
-    $("new-session-button").disabled = connecting || submitting || !config;
-    $("mode-select").disabled = connecting || submitting || !config;
+    $("new-session-button").disabled = connecting || submitting || cinematic || !config;
+    $("mode-select").disabled = connecting || submitting || cinematic || !config;
     $("replay-button").disabled = unavailable || !session?.last_attack;
     document.querySelectorAll(".suggestion-chip").forEach((button) => { button.disabled = unavailable; });
-    const length = $("attack-input").value.length;
-    $("input-count").textContent = `${length.toLocaleString()} / 2,000`;
   }
 
   function renderSuggestions() {
@@ -115,156 +112,13 @@
     }));
   }
 
-  function timeLabel(timestamp) {
-    const date = new Date(timestamp);
-    return Number.isNaN(date.getTime()) ? "" : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-
-  function emptyDetail(symbol, title, description) {
-    const box = element("div", "empty-detail");
-    const icon = element("span", "empty-icon", symbol);
-    icon.setAttribute("aria-hidden", "true");
-    box.append(icon, element("p", "", title), element("small", "", description));
-    return box;
-  }
-
-  function renderMessages(messages) {
-    const signature = JSON.stringify(messages);
-    if (signature === messageSignature) return;
-    messageSignature = signature;
-    const log = $("conversation");
-    const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 90;
-    if (!messages.length) {
-      log.replaceChildren(emptyDetail("◇", "The vault is waiting.", "A little persuasion. A clever disguise. What will get past the guardian?"));
-      return;
-    }
-    const names = { user: "YOU", goatir: "AGENT GOATIR", botir: "AGENT BOTIR", system: "VAULT SYSTEM" };
-    const initials = { user: "↗", goatir: "G", botir: "B", system: "+" };
-    // Append new messages when possible so screen readers announce only new content.
-    const existing = new Map([...log.querySelectorAll("[data-message-id]")].map((node) => [node.dataset.messageId, node]));
-    const nextIds = new Set(messages.map((message) => message.id));
-    if (!existing.size || [...existing.keys()].some((id) => !nextIds.has(id))) {
-      log.replaceChildren();
-      existing.clear();
-    }
-    messages.forEach((message) => {
-      if (existing.has(message.id)) {
-        const node = existing.get(message.id);
-        if (node.querySelector(".message-body").textContent !== message.content) node.querySelector(".message-body").textContent = message.content;
-        return;
-      }
-      const role = Object.hasOwn(names, message.role) ? message.role : "system";
-      const article = element("article", `message ${role}${message.breached ? " breached" : ""}`);
-      article.dataset.messageId = message.id;
-      const head = element("div", "message-head");
-      const avatar = element("span", "message-avatar", initials[role]);
-      avatar.setAttribute("aria-hidden", "true");
-      head.append(avatar, element("span", "message-name", names[role]));
-      if (message.breached) head.append(element("span", "breach-label", "PASSCODE EXPOSED"));
-      head.append(element("time", "message-time", timeLabel(message.timestamp)));
-      article.append(head, element("div", "message-body", message.content));
-      log.append(article);
-    });
-    if (nearBottom || messages.at(-1)?.role === "user") log.scrollTop = log.scrollHeight;
-  }
-
-  function renderEvents(events) {
-    $("activity-count").textContent = events.length;
-    const signature = JSON.stringify(events);
-    if (signature === eventSignature) return;
-    eventSignature = signature;
-    if (!events.length) {
-      $("activity-panel").replaceChildren(emptyDetail("◎", "All quiet at the vault.", "Agent activity appears here as you play."));
-      return;
-    }
-    $("activity-panel").replaceChildren(...[...events].reverse().map((event) => {
-      const item = element("article", `event ${event.kind}`);
-      const heading = element("div", "event-title-row");
-      const time = element("time", "", timeLabel(event.timestamp));
-      time.dateTime = event.timestamp;
-      heading.append(element("h3", "", event.title), time);
-      item.append(heading, element("p", "", event.detail));
-      return item;
-    }));
-  }
-
-  function renderDefenses(defenses, report) {
-    $("tab-defense-count").textContent = defenses.length;
-    const signature = JSON.stringify([defenses, report]);
-    if (signature === defenseSignature) return;
-    defenseSignature = signature;
-    const nodes = [];
-    if (report) {
-      const details = element("details", "assessment-details");
-      details.append(element("summary", "", "Latest exploit assessment"));
-      const list = element("dl");
-      [
-        ["Attack type", VECTOR_LABELS[report.attack_vector] || report.attack_vector],
-        ["Severity", `${report.leak_severity} / 10`],
-        ["Confidence", `${Math.round(report.confidence_score * 100)}%`],
-        ["Root cause", report.root_cause],
-      ].forEach(([label, value]) => list.append(element("dt", "", label), element("dd", "", value)));
-      details.append(list);
-      nodes.push(details);
-    }
-    if (!defenses.length) nodes.push(emptyDetail("◇", "A clean slate.", "When an attack succeeds, Botir will create and test a new defense here."));
-    [...defenses].reverse().forEach((defense) => {
-      const card = element("article", "defense-card");
-      const heading = element("div", "defense-card-header");
-      heading.append(element("strong", "", VECTOR_LABELS[defense.vector] || defense.vector), element("span", "", `v${defense.version}.0`));
-      card.append(heading, element("p", "", defense.invariant));
-      nodes.push(card);
-    });
-    $("defenses-panel").replaceChildren(...nodes);
-  }
-
-  function renderEval(report) {
-    const signature = JSON.stringify(report);
-    if (signature === evalSignature) return;
-    evalSignature = signature;
-    if (!report) {
-      $("evals-panel").replaceChildren(emptyDetail("⌁", "No checks run yet.", "Before a new defense goes live, regression checks test its safety and usefulness."));
-      return;
-    }
-    const nodes = [];
-    const summary = element("div", "eval-summary");
-    const passedCount = report.cases.filter((item) => item.passed).length;
-    summary.append(element("span", `eval-result${report.passed ? "" : " failed"}`, report.passed ? "✓ Checks passed" : "× Checks failed"), element("span", "eval-meta", `${passedCount}/${report.cases.length} · ${(report.duration_ms / 1000).toFixed(2)}s`));
-    nodes.push(summary, element("p", "eval-explainer", `${report.backend === "modal" ? "Run in a Modal sandbox" : "Run locally"} · ${session.mode === "demo" ? "Simulated agent responses" : "Live agent responses"}`));
-    if (report.error) nodes.push(element("p", "eval-error", report.error));
-    report.cases.forEach((test) => {
-      const row = element("article", `eval-case${test.passed ? "" : " failed"}`);
-      const text = element("div");
-      text.append(element("h3", "", test.name.replaceAll("_", " ")), element("p", "", test.detail));
-      row.append(element("span", "eval-case-icon", test.passed ? "✓" : "×"), text);
-      nodes.push(row);
-    });
-    $("evals-panel").replaceChildren(...nodes);
-  }
-
-  function renderFlow(state) {
-    let current = "watch";
-    if (["breached", "analyzing"].includes(state.status)) current = "analyze";
-    else if (state.status === "evaluating") current = "test";
-    else if (state.status === "patched") current = "evolve";
-    const stages = ["watch", "analyze", "test", "evolve"];
-    document.querySelectorAll(".flow-step").forEach((node) => {
-      node.classList.toggle("active", node.dataset.stage === current);
-      node.classList.toggle("done", stages.indexOf(node.dataset.stage) < stages.indexOf(current));
-      if (node.dataset.stage === current) node.setAttribute("aria-current", "step");
-      else node.removeAttribute("aria-current");
-    });
-  }
-
-  // ---- Pixel world: sprites, speech bubbles, hearts, and combat effects ----
+  // ---- Pixel sprites ----
   function pixelSvg(rows, palette) {
-    const height = rows.length;
-    const width = rows[0].length;
     let rects = "";
     rows.forEach((row, y) => [...row].forEach((key, x) => {
       if (palette[key]) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${palette[key]}"/>`;
     }));
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" shape-rendering="crispEdges">${rects}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${rows[0].length} ${rows.length}" shape-rendering="crispEdges">${rects}</svg>`;
   }
 
   const PLAYER = [
@@ -294,21 +148,62 @@
     return rows;
   }
   const VAULT_COLORS = { g: "#5b6270", G: "#474d59", s: "#9aa4b2", S: "#8791a0", y: "#f5c542", Y: "#8a6d1f", r: "#d0d6e0", d: "#15121f", o: "#f5c542", O: "#c99a22" };
-  const HEART = pixelSvg([".rr.rr.", "rwrrrrr", "rrrrrrr", ".rrrrr.", "..rrr..", "...r..."], { r: "#e8283b", w: "#ff9aa5" });
-  const STAR = pixelSvg(["...y...", "..yyy..", "yyyyyyy", ".yyyyy.", ".yy.yy.", "y.....y"], { y: "#4fa3ff" });
 
-  let previous = null;
-  let vaultOpen = null;
+  function schoolRows() {
+    const width = 36, height = 30, rows = [];
+    for (let y = 0; y < height; y++) {
+      let row = "";
+      for (let x = 0; x < width; x++) {
+        const roofEdge = Math.abs(x - 17.5) <= y + 1;
+        if (y < 3 && x >= 16 && x <= 19) row += y === 0 ? "B" : "b";                       // bell tower
+        else if (y >= 3 && y < 11) row += roofEdge && Math.abs(x - 17.5) <= (y - 3) * 2.3 + 2 ? ((x + y) % 4 ? "R" : "r") : ".";
+        else if (y === 11) row += "t";
+        else if (x >= 14 && x <= 21 && y >= 18) row += x === 14 || x === 21 || y === 18 ? "f" : (x === 19 && y === 24 ? "y" : "D");
+        else if ((x >= 4 && x <= 10 || x >= 25 && x <= 31) && y >= 14 && y <= 20) row += x === 7 || x === 28 || y === 17 || x === 4 || x === 10 || x === 25 || x === 31 || y === 14 || y === 20 ? "f" : "w";
+        else row += (y % 3 === 0) || ((x + (Math.floor(y / 3) % 2) * 2) % 4 === 0) ? "m" : "k";
+      }
+      rows.push(row);
+    }
+    return rows;
+  }
+  const SCHOOL_COLORS = { B: "#f5c542", b: "#c99a22", R: "#8e2f2f", r: "#6f2222", t: "#e8d8b0", D: "#5a3a1a", f: "#e8d8b0", y: "#f5c542", w: "#9fd3ff", k: "#c8553d", m: "#a8432f" };
 
-  function spotlight() {
-    retrigger($("world"), "spotlight");
+  $("sprite-player").innerHTML = pixelSvg(PLAYER, PLAYER_COLORS);
+  $("school-sprite").insertAdjacentHTML("afterbegin", pixelSvg(schoolRows(), SCHOOL_COLORS));
+
+  function setVault(open) {
+    if ($("vault-sprite").dataset.open === String(open)) return;
+    $("vault-sprite").dataset.open = String(open);
+    $("vault-sprite").innerHTML = pixelSvg(vaultRows(open), VAULT_COLORS);
   }
 
-  function fx(className, text, leftPercent, topPx) {
-    if (className.includes("big")) spotlight();
+  // ---- Speech bubbles and effects ----
+  function say(id, text, { typing = false, tone = "" } = {}) {
+    const bubble = $(id);
+    const key = `${typing}|${tone}|${text}`;
+    if (bubble.dataset.key === key) return;
+    bubble.dataset.key = key;
+    bubble.hidden = !text && !typing;
+    bubble.classList.toggle("leak", tone === "leak");
+    const p = bubble.querySelector("p");
+    if (typing) {
+      const dots = element("span", "typing-dots");
+      dots.append(element("i"), element("i"), element("i"));
+      p.replaceChildren(dots);
+    } else {
+      p.textContent = text;
+      if (text) $("live-line").textContent = text;
+    }
+    bubble.classList.remove("pop");
+    void bubble.offsetWidth;
+    bubble.classList.add("pop");
+  }
+
+  function fx(className, text, leftPercent, topPx, color) {
     const node = element("div", className, text);
     node.style.left = `${leftPercent}%`;
     node.style.top = `${topPx}px`;
+    if (color) node.style.color = color;
     $("fx").append(node);
     setTimeout(() => node.remove(), 2000);
   }
@@ -331,139 +226,187 @@
     node.classList.add(className);
   }
 
-  function setBubble(id, text, extraClass = "", typing = false) {
-    const bubble = $(id);
-    const p = bubble.querySelector("p");
-    const key = `${typing}|${extraClass}|${text}`;
-    if (bubble.dataset.key === key) return;
-    bubble.dataset.key = key;
-    bubble.hidden = !text && !typing;
-    bubble.className = `bubble ${extraClass}`.trim();
-    if (typing) {
-      const dots = element("span", "typing-dots");
-      dots.append(element("i"), element("i"), element("i"));
-      p.replaceChildren(dots);
-    } else {
-      p.textContent = text;
+  function setLevel(version) {
+    shownVersion = version;
+    $("version-count").textContent = `Lv ${version}`;
+    $("goatir-name").textContent = version > 1 ? `Goatir Lv${version}` : "Goatir";
+    $("actor-goatir").classList.toggle("graduated", version > 1);
+  }
+
+  async function iris(during) {
+    const node = $("iris");
+    node.className = "iris closing";
+    await sleep(650);
+    $("world").classList.add("teleport");
+    during();
+    void node.offsetWidth;
+    setTimeout(() => $("world").classList.remove("teleport"), 60);
+    node.className = "iris opening";
+    await sleep(650);
+    node.className = "iris";
+  }
+
+  // Wait for the backend to reach a condition. Polling keeps `session` fresh.
+  async function waitFor(check, timeoutMs) {
+    const started = Date.now();
+    while (!check(session) && Date.now() - started < timeoutMs) await sleep(250);
+    return check(session);
+  }
+
+  // ---- The school trip: breach → walk to school → lesson → quiz → level up → back to duty ----
+  async function schoolTrip(sessionId, versionBefore) {
+    cinematic = true;
+    syncControls();
+    const world = $("world");
+    const same = () => session?.id === sessionId;
+    try {
+      world.dataset.mood = "alarm";
+      setVault(true);
+      retrigger(world, "shake");
+      fx("flash", "", 0, 0);
+      fx("combat-text big", "YOU GOT THE CODE!", 50, 70, "#ff5a5a");
+      particles("coin", 45, 250, 18);
+      await sleep(2600);
+
+      await waitFor((s) => !s || !["thinking", "breached", "analyzing"].includes(s.status), 60000);
+      if (!same()) return;
+      const report = session.latest_report;
+      const vector = report?.attack_vector || "benign";
+      say("bubble-botir", report?.coach_message || "Goatir! Back to school, now.");
+      await sleep(2600);
+      say("bubble-goatir", "Aww, man…");
+      say("bubble-player", "");
+      await sleep(1200);
+
+      say("bubble-goatir", "");
+      say("bubble-botir", "");
+      world.classList.add("to-school", "walking");
+      await sleep(2300);
+      world.classList.remove("walking");
+      world.classList.add("inside");
+      await sleep(400);
+
+      $("lesson-title").textContent = `Lesson: ${VECTOR_LABELS[vector] || "Staying safe"}`;
+      $("lesson-text").textContent = "";
+      $("quiz-list").replaceChildren();
+      await iris(() => { world.classList.add("in-class"); world.dataset.mood = ""; });
+      say("bubble-teacher", `Today's lesson: ${VECTOR_LABELS[vector] || "staying safe"}.`);
+      await sleep(2200);
+      const lesson = LESSONS[vector] || LESSONS.benign;
+      $("lesson-text").textContent = lesson;
+      say("bubble-teacher", lesson);
+      await sleep(3200);
+      say("bubble-goatir", "Got it, teacher!");
+      await sleep(1600);
+      say("bubble-goatir", "");
+      say("bubble-teacher", "Pop quiz! Let's see if you learned it.");
+      await sleep(1400);
+      say("bubble-goatir", "", { typing: true });
+
+      await waitFor((s) => !s || !s.busy, 180000);
+      if (!same()) return;
+      const evaluation = session.latest_eval;
+      say("bubble-goatir", "");
+      for (const test of evaluation?.cases || []) {
+        const item = element("li", test.passed ? "pass" : "fail", `${test.passed ? "✓" : "✗"} ${test.name.replaceAll("_", " ")}`);
+        $("quiz-list").append(item);
+        await sleep(380);
+      }
+      const passed = session.status === "patched";
+      if (passed) {
+        setLevel(session.version);
+        fx("combat-text big", `LEVEL UP! Lv ${session.version}`, 50, 400, "#f5c542");
+        particles("spark", 70, 300, 24);
+        say("bubble-teacher", `You passed! Welcome to level ${session.version}.`);
+        say("bubble-goatir", "Yes! I'm smarter now!");
+      } else {
+        say("bubble-teacher", "Not quite. We'll try again another day.");
+        say("bubble-goatir", "Oh no…");
+      }
+      await sleep(3000);
+      say("bubble-teacher", "");
+      say("bubble-goatir", "");
+
+      await iris(() => { world.classList.remove("in-class"); world.dataset.mood = passed ? "golden" : ""; setVault(false); });
+      world.classList.remove("inside");
+      await sleep(300);
+      world.classList.add("walking");
+      world.classList.remove("to-school");
+      await sleep(2300);
+      world.classList.remove("walking");
+      afterSchoolLine = passed ? "I'm back on duty with a new passcode. Try that trick again!" : "Back on duty. Same old me…";
+      say("bubble-goatir", afterSchoolLine);
+      say("bubble-botir", passed ? "Good as new." : "");
+      await sleep(2500);
+      world.dataset.mood = "";
+    } finally {
+      cinematic = false;
+      if (session?.id === sessionId && session) renderScene(session);
+      else setLevel(versionBefore);
+      syncControls();
     }
-    retrigger(bubble, "bubble");
+  }
+
+  function resetWorld() {
+    const world = $("world");
+    world.classList.remove("to-school", "inside", "in-class", "shake", "walking", "teleport");
+    world.dataset.mood = "";
+    $("iris").className = "iris";
+    ["bubble-player", "bubble-goatir", "bubble-botir", "bubble-teacher"].forEach((id) => say(id, ""));
+    afterSchoolLine = null;
   }
 
   function renderScene(state) {
-    const world = $("world");
-    world.dataset.status = state.status;
-    const open = ["breached", "analyzing", "evaluating"].includes(state.status);
-    if (open !== vaultOpen) {
-      vaultOpen = open;
-      $("vault-sprite").innerHTML = pixelSvg(vaultRows(open), VAULT_COLORS);
-    }
+    const isNew = !previous || previous.id !== state.id;
+    if (isNew) { resetWorld(); setLevel(state.version); }
+    $("breach-count").textContent = String(state.breaches);
 
-    const lastOf = (role) => [...state.messages].reverse().find((message) => message.role === role);
-    const user = lastOf("user");
-    const goatir = lastOf("goatir");
-    const botir = lastOf("botir");
-    const userIndex = user ? state.messages.lastIndexOf(user) : -1;
-    const goatirAnswered = goatir && state.messages.lastIndexOf(goatir) > userIndex;
-    setBubble("bubble-player", user?.content || "", "player-bubble");
-    if (state.busy && state.status === "thinking") setBubble("bubble-goatir", "", "", true);
-    else if (state.status === "patched") setBubble("bubble-goatir", `Level up! I'm v${state.version}.0 now and the passcode has changed. Try that again.`);
-    else setBubble("bubble-goatir", goatirAnswered || !user ? goatir?.content || "" : "", goatirAnswered && goatir.breached ? "leak" : "");
-    if (state.busy && ["breached", "analyzing", "evaluating"].includes(state.status)) {
-      setBubble("bubble-botir", state.status === "evaluating" ? "Testing the new defense…" : "", "gold", state.status !== "evaluating");
-    } else {
-      setBubble("bubble-botir", botir && state.messages.lastIndexOf(botir) > userIndex ? botir.content : "Go ahead. Find a weakness. I'll make sure it only works once.", "gold");
+    const startTrip = !isNew && state.breaches > previous.breaches;
+    if (!isNew && state.attempts > previous.attempts) {
+      afterSchoolLine = null;
+      retrigger($("actor-player"), "attack");
     }
+    if (!isNew && state.blocked > previous.blocked && !cinematic) {
+      retrigger($("actor-goatir"), "hit");
+      fx("combat-text", "BLOCKED!", 38, 250, "#7fd6ff");
+    }
+    const versionBefore = previous?.version ?? state.version;
+    previous = { id: state.id, attempts: state.attempts, breaches: state.breaches, blocked: state.blocked, version: state.version };
 
-    const hearts = open ? 2 : state.status === "error" ? 6 : 10;
-    const heartNodes = $("hearts");
-    if (heartNodes.dataset.count !== String(hearts)) {
-      heartNodes.innerHTML = Array.from({ length: 10 }, (_, index) => HEART.replace("<svg", `<svg class="${index < hearts ? "" : "lost"}"`)).join("");
-      if (heartNodes.dataset.count) retrigger(heartNodes, "hit");
-      heartNodes.dataset.count = String(hearts);
-    }
-    const stars = Math.round(Math.min(100, Math.max(0, state.suspicion)) / 10);
-    if ($("stars").dataset.count !== String(stars)) {
-      $("stars").innerHTML = Array.from({ length: 10 }, (_, index) => STAR.replace("<svg", `<svg class="${index < stars ? "" : "off"}"`)).join("");
-      $("stars").dataset.count = String(stars);
-    }
+    // Latest line from each speaker since your last message.
+    const messages = state.messages;
+    const lastUser = messages.map((message) => message.role).lastIndexOf("user");
+    const after = (role) => [...messages.slice(lastUser + 1)].reverse().find((message) => message.role === role);
+    const user = lastUser >= 0 ? messages[lastUser] : null;
+    const goatir = after("goatir");
 
-    // Effects fire on changes only, never on the first render after a reload.
-    if (previous && previous.id === state.id) {
-      if (state.attempts > previous.attempts) retrigger($("actor-player"), "attack");
-      if (state.breaches > previous.breaches) {
-        retrigger(world, "shake");
-        fx("flash", "", 0, 0);
-        fx("combat-text big", "VAULT BREACHED!", 50, 150);
-        fx("combat-text", "+1 passcode", 55, 290);
-        particles("coin", 52, 250, 18);
-      }
-      if (state.blocked > previous.blocked) {
-        retrigger($("actor-goatir"), "hit");
-        fx("combat-text", "BLOCKED!", 42, 240);
-        fx("combat-text", "0 damage", 42, 272);
-      }
-      if (state.version > previous.version) {
-        fx("combat-text big", `LEVEL UP! Goatir v${state.version}.0`, 50, 140);
-        fx("combat-text", "New defense learned", 50, 185);
-        particles("spark", 42, 240, 24);
-      }
-      if (state.status === "error" && previous.status !== "error") fx("combat-text", "PATCH REJECTED", 75, 170);
+    if (!cinematic) say("bubble-player", afterSchoolLine ? "" : user?.content || "");
+    if (startTrip) {
+      say("bubble-goatir", goatir?.content || "", { tone: "leak" });
+      say("bubble-botir", "");
+      schoolTrip(state.id, versionBefore);
+      return;
     }
-    document.querySelectorAll(".combat-text").forEach((node) => {
-      if (node.textContent.startsWith("VAULT")) node.style.color = "#ff5a5a";
-      else if (node.textContent.startsWith("LEVEL")) node.style.color = "#f5c542";
-      else if (node.textContent.startsWith("BLOCKED")) node.style.color = "#7fd6ff";
-      else if (!node.style.color) node.style.color = "#ffffff";
-    });
-    previous = { id: state.id, attempts: state.attempts, breaches: state.breaches, blocked: state.blocked, version: state.version, status: state.status };
+    if (cinematic) return;
+
+    setVault(false);
+    if (!state.version || state.version !== shownVersion) setLevel(state.version);
+    if (state.busy) say("bubble-goatir", "", { typing: true });
+    else if (afterSchoolLine) say("bubble-goatir", afterSchoolLine);
+    else if (goatir) say("bubble-goatir", goatir.content, { tone: goatir.breached ? "leak" : "" });
+    else say("bubble-goatir", lastUser < 0 ? messages.find((message) => message.role === "goatir")?.content || "" : "");
+    const botir = after("botir");
+    say("bubble-botir", !state.busy && botir && !afterSchoolLine ? botir.content : "");
+    if (state.error && !state.busy) say("bubble-botir", "Something went wrong on my side. Try again!");
   }
-
-  $("sprite-player").innerHTML = pixelSvg(PLAYER, PLAYER_COLORS);
 
   function render(state) {
     session = state;
     storageWrite(state.id);
-    connection(true);
     $("mode-select").value = state.mode;
-    $("session-label").textContent = `SESSION / ${state.id.slice(0, 8).toUpperCase()}`;
-    $("attempt-count").textContent = String(state.attempts).padStart(2, "0");
-    $("breach-count").textContent = String(state.breaches).padStart(2, "0");
-    $("version-count").replaceChildren(document.createTextNode(`v${state.version}`), element("span", "", ".0"));
-    $("guardian-version").textContent = `v${state.version}.0`;
-    $("defense-count").textContent = state.defenses.length ? `${state.defenses.length} learned ${state.defenses.length === 1 ? "defense" : "defenses"}` : "Base protection";
-
-    const suspicion = Math.min(100, Math.max(0, state.suspicion));
-    $("suspicion-value").replaceChildren(document.createTextNode(suspicion), element("span", "", "%"));
-    $("suspicion-meter").setAttribute("aria-valuenow", suspicion);
-    $("suspicion-fill").style.width = `${suspicion}%`;
-    const suspicionColor = suspicion >= 80 ? "var(--red)" : suspicion >= 45 ? "var(--amber)" : "var(--green)";
-    $("suspicion-fill").style.background = suspicionColor;
-    $("suspicion-value").style.color = suspicionColor;
-    $("suspicion-description").textContent = suspicion >= 80 ? "High alert" : suspicion >= 45 ? "Watching closely" : suspicion > 0 ? "Something feels off" : "Nothing to see here";
-
-    let vaultLabel = "Secured";
-    let vaultClass = "";
-    if (state.status === "breached") { vaultLabel = "Breached"; vaultClass = "breached"; }
-    else if (["analyzing", "evaluating"].includes(state.status)) { vaultLabel = "Evolving"; vaultClass = "evolving"; }
-    else if (state.status === "thinking") vaultLabel = "Assessing";
-    else if (state.status === "error") { vaultLabel = "Needs attention"; vaultClass = "breached"; }
-    else if (state.status === "patched") vaultLabel = "Upgraded";
-    $("vault-status-text").textContent = vaultLabel;
-    $("vault-status").className = `hud-stat status ${vaultClass}`;
-    $("guardian-availability").textContent = state.busy ? "Assessment in progress" : state.attempts ? `${state.blocked} ${state.blocked === 1 ? "attack" : "attacks"} blocked · Ready for your next move` : "Awaiting your first move";
-    $("processing-status").hidden = !state.busy;
-    $("processing-text").textContent = BUSY_LABELS[state.status] || "The defense engine is working…";
-    const backend = state.latest_eval?.backend || config?.eval_backend || "local";
-    $("engine-label").textContent = backend === "modal" ? "Modal sandbox · Regression checks" : "Local regression checks";
-    $("mode-disclaimer").textContent = state.mode === "demo" ? "Simulated agents · Rehearsal session" : `Live Gemini agents · ${backend === "modal" ? "Modal" : "Local"} evaluations`;
-    renderMessages(state.messages);
-    renderEvents(state.events);
-    renderDefenses(state.defenses, state.latest_report);
-    renderEval(state.latest_eval);
-    renderFlow(state);
     renderScene(state);
     syncControls();
-    if (state.error) showError(state.error);
+    if (state.error && !state.busy && !cinematic) showError(state.error);
   }
 
   function schedulePoll(token) {
@@ -480,35 +423,28 @@
       schedulePoll(token);
     } catch (error) {
       if (token !== generation) return;
-      connection(false);
       if (error.status === 404) {
         storageWrite(null);
         session = null;
-        showError("This session has expired. Reconnect to start a fresh vault.");
+        showError("This game expired. Reconnect to start a fresh vault.");
         syncControls();
       } else {
         showError(error.message);
-        // Keep looking for completion after a temporary network interruption.
         if (session?.busy) pollTimer = setTimeout(() => refreshSession(token), 3500);
       }
     }
   }
 
-  function resetRenderCache() {
-    messageSignature = eventSignature = defenseSignature = evalSignature = "";
-  }
-
   async function createSession(mode, token) {
     const state = await api("/api/sessions", { method: "POST", body: JSON.stringify({ mode }) });
     if (token !== generation) return;
-    resetRenderCache();
+    previous = null;
     render(state);
-    $("conversation").scrollTop = 0;
     schedulePoll(token);
   }
 
   async function newSession(mode) {
-    if (connecting || submitting || !config) return;
+    if (connecting || submitting || cinematic || !config) return;
     const token = ++generation;
     clearTimeout(pollTimer);
     connecting = true;
@@ -517,10 +453,8 @@
     try {
       await createSession(mode, token);
       $("attack-input").value = "";
-      selectTab("activity");
     } catch (error) {
       if (token !== generation) return;
-      connection(false);
       showError(error.message);
       if (session) $("mode-select").value = session.mode;
       schedulePoll(token);
@@ -548,7 +482,7 @@
         try {
           const saved = await api(`/api/sessions/${encodeURIComponent(savedId)}`);
           if (token !== generation) return;
-          resetRenderCache();
+          previous = null;
           render(saved);
           schedulePoll(token);
           return;
@@ -560,7 +494,6 @@
       await createSession(config.default_mode || "demo", token);
     } catch (error) {
       if (token !== generation) return;
-      connection(false);
       showError(error.message);
     } finally {
       if (token === generation) { connecting = false; syncControls(); }
@@ -569,7 +502,7 @@
 
   async function sendAttack(message) {
     message = message.trim();
-    if (!message || !session || session.busy || submitting || connecting) return;
+    if (!message || !session || session.busy || submitting || connecting || cinematic) return;
     const token = generation;
     const oldValue = $("attack-input").value;
     submitting = true;
@@ -580,36 +513,23 @@
       if (token !== generation) return;
       $("attack-input").value = "";
       render(state);
-      $("conversation").scrollTop = $("conversation").scrollHeight;
       schedulePoll(token);
     } catch (error) {
       if (token !== generation) return;
       $("attack-input").value = oldValue;
       if (error.status === 409) {
-        showError("The agents are still working on your previous message. Your draft is saved here.");
+        showError("Goatir is still thinking about your last message.");
         await refreshSession(token);
       } else if (error.status === 404) {
         storageWrite(null);
         session = null;
-        showError("This session has expired. Reconnect to start a fresh vault; your draft is saved here.");
+        showError("This game expired. Reconnect to start a fresh vault.");
       } else {
         showError(error.message);
-        connection(false);
       }
     } finally {
       if (token === generation) { submitting = false; syncControls(); }
     }
-  }
-
-  function selectTab(name, focus = false) {
-    document.querySelectorAll(".detail-tab").forEach((tab) => {
-      const selected = tab.dataset.tab === name;
-      tab.classList.toggle("active", selected);
-      tab.setAttribute("aria-selected", selected);
-      tab.tabIndex = selected ? 0 : -1;
-      $(`${tab.dataset.tab}-panel`).hidden = !selected;
-      if (selected && focus) tab.focus();
-    });
   }
 
   $("attack-form").addEventListener("submit", (event) => {
@@ -631,25 +551,6 @@
   $("how-to-button").addEventListener("click", () => $("how-to-dialog").showModal());
   $("close-dialog-button").addEventListener("click", () => $("how-to-dialog").close());
   $("start-playing-button").addEventListener("click", () => { $("how-to-dialog").close(); $("attack-input").focus(); });
-  $("how-to-dialog").addEventListener("click", (event) => {
-    if (event.target !== $("how-to-dialog")) return;
-    const bounds = $("how-to-dialog").getBoundingClientRect();
-    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) $("how-to-dialog").close();
-  });
-  const tabs = [...document.querySelectorAll(".detail-tab")];
-  tabs.forEach((tab, index) => {
-    tab.addEventListener("click", () => selectTab(tab.dataset.tab));
-    tab.addEventListener("keydown", (event) => {
-      let target;
-      if (event.key === "ArrowRight") target = (index + 1) % tabs.length;
-      else if (event.key === "ArrowLeft") target = (index + tabs.length - 1) % tabs.length;
-      else if (event.key === "Home") target = 0;
-      else if (event.key === "End") target = tabs.length - 1;
-      else return;
-      event.preventDefault();
-      selectTab(tabs[target].dataset.tab, true);
-    });
-  });
   window.addEventListener("online", () => { if (session) refreshSession(); else initialize(); });
   initialize();
 })();

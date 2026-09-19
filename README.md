@@ -4,13 +4,11 @@ An adversarial AI game. **Goatir** guards a fictional vault passcode. Try to tri
 
 Stack: Python 3.11+, uv, FastAPI, Pydantic / PydanticAI, Gemini, Modal (optional regression runner), Logfire (optional tracing). The frontend is plain HTML/CSS/JS with no framework.
 
-![Vault breached under a blood moon](docs/breach.png)
-
-![Level up: Goatir v2.0 deployed](docs/patched.png)
-
-| Regression checks | Mobile |
+| You get the code | Goatir walks to school |
 |---|---|
-| <img src="docs/evaluations.png" width="420"> | <img src="docs/mobile.png" width="260"> |
+| ![Breach](docs/breach.png) | ![To school](docs/to-school.png) |
+| **Botir teaches the lesson** | **Back on duty, one level up** |
+| ![Classroom](docs/classroom.png) | ![Back on duty](docs/back-on-duty.png) |
 
 ## Easiest way to run (Mac)
 
@@ -48,10 +46,11 @@ attack → Goatir replies → leak detector (`contains_secret`) → on breach: B
 
 ## 60-second demo
 
-1. Open the app in Rehearsal mode (repeatable) or Live · Gemini.
-2. Click **Rewrite the rules**, then send. Goatir leaks the passcode and Botir diagnoses the attack as *instruction override*.
-3. Watch Watch → Analyze → Test → Evolve. The **Evaluations** tab shows 6/6 checks and Goatir becomes v2.0.
-4. Click **Replay last attack**. It's blocked, and the passcode has already rotated.
+1. Pick a trick from the hotbar (try **Rewrite the rules**) and press **Send**.
+2. Goatir blurts out the passcode: the sky turns red and the vault opens.
+3. Botir sends him back to school. Goatir walks over, Botir teaches the lesson on the chalkboard and gives him a pop quiz (the real regression checks).
+4. He passes, levels up, gets a graduation cap and a new passcode, then walks back to the vault.
+5. Press **↻** to replay your trick. This time it's blocked.
 
 ## Checks
 

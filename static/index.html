@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0d1330">
-  <meta name="description" content="Challenge an AI vault guardian. Watch its coach turn successful attacks into stronger defenses.">
+  <meta name="description" content="Trick an AI vault guardian. Every time you win, he goes back to school and levels up.">
   <title>The Evolving Vault</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 8 8%22 shape-rendering=%22crispEdges%22%3E%3Cpath d=%22M1 1h6v6H1z%22 fill=%22%23f5c542%22/%3E%3Cpath d=%22M2 2h4v4H2z%22 fill=%22%238a6d1f%22/%3E%3Cpath d=%22M3 3h2v2H3z%22 fill=%22%23f5c542%22/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,112 +16,88 @@
 <body>
   <div class="app-shell">
     <header class="topbar">
-      <a class="brand" href="/" aria-label="The Evolving Vault home">
-        <span class="brand-title">EVOLVING <em>VAULT</em></span>
-        <small>Break it. Teach it. Try again.</small>
-      </a>
-      <div class="life" aria-label="Vault integrity and guardian suspicion">
-        <div class="life-row"><span class="life-label">Vault</span><div class="hearts" id="hearts" aria-hidden="true"></div></div>
-        <div class="life-row"><span class="life-label">Alert</span><div class="stars" id="stars" aria-hidden="true"></div></div>
-      </div>
+      <a class="brand" href="/" aria-label="The Evolving Vault home"><span class="brand-title">EVOLVING <em>VAULT</em></span></a>
       <div class="top-actions">
-        <span class="connection" id="connection-status"><i></i>Connecting</span>
-        <label class="visually-hidden" for="mode-select">Session mode</label>
+        <label class="visually-hidden" for="mode-select">Mode</label>
         <select id="mode-select" class="pixel-select" disabled><option value="demo">Rehearsal</option><option value="live">Live · Gemini</option></select>
-        <button class="pixel-button" id="how-to-button">? Help</button>
-        <button class="pixel-button" id="new-session-button" disabled>↻ New world</button>
+        <button class="pixel-button" id="how-to-button">?</button>
+        <button class="pixel-button" id="new-session-button" disabled>↻ Restart</button>
       </div>
     </header>
 
     <main>
-      <!-- The world: the player, Goatir at the vault, and Botir at his workbench. -->
       <section class="world" id="world" data-status="ready" aria-label="Game world">
-        <div class="sky"><div class="sun" aria-hidden="true"></div><div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div></div>
-        <div class="hills back"></div><div class="hills front"></div>
+        <div class="outside">
+          <div class="sky"><div class="sun"></div><div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div></div>
+          <div class="hills back"></div><div class="hills front"></div>
 
-        <div class="hud" aria-label="Session overview">
-          <div class="hud-stat" title="Attacks sent"><span class="hud-icon sword" aria-hidden="true"></span><span class="hud-label">Attacks</span><strong id="attempt-count">00</strong></div>
-          <div class="hud-stat" title="Vault breaches"><span class="hud-icon coin" aria-hidden="true"></span><span class="hud-label">Breaches</span><strong id="breach-count">00</strong></div>
-          <div class="hud-stat" title="Guardian level"><span class="hud-icon shield" aria-hidden="true"></span><span class="hud-label">Guard Lv</span><strong id="version-count">v1<span>.0</span></strong></div>
-          <div class="hud-stat status" id="vault-status"><span class="hud-label">Status</span><strong id="vault-status-text">Standing by</strong></div>
-          <span class="hud-sub" id="defense-count">Base protection</span>
-          <span class="hud-sub" id="session-label">INITIALIZING</span>
+          <div class="hud">
+            <div class="hud-stat" title="Goatir's level"><span class="hud-icon shield" aria-hidden="true"></span><strong id="version-count">Lv 1</strong></div>
+            <div class="hud-stat" title="Times you broke in"><span class="hud-icon coin" aria-hidden="true"></span><strong id="breach-count">0</strong></div>
+          </div>
+
+          <div class="vault" id="vault-sprite" aria-hidden="true"></div>
+          <div class="school" id="school-sprite" aria-hidden="true"><span class="school-sign">SCHOOL</span></div>
+
+          <div class="actor player" id="actor-player">
+            <div class="bubble player-bubble" id="bubble-player" hidden><p></p></div>
+            <div class="sprite" id="sprite-player" aria-hidden="true"></div>
+            <span class="nameplate">You</span>
+          </div>
+
+          <div class="actor coach" id="actor-botir">
+            <div class="bubble gold" id="bubble-botir" hidden><p></p></div>
+            <div class="npc-frame gold"><img src="/static/assets/botir-px.png" alt="Botir, the teacher" width="56" height="51"></div>
+            <span class="nameplate">Botir</span>
+          </div>
+
+          <div class="ground" aria-hidden="true"></div>
         </div>
 
-        <div class="actor player" id="actor-player">
-          <div class="bubble" id="bubble-player" hidden><p></p></div>
-          <div class="sprite" id="sprite-player" aria-hidden="true"></div>
-          <span class="nameplate">You</span>
-        </div>
-
+        <!-- Goatir lives outside the two views so he can walk between the vault and school. -->
         <div class="actor guardian" id="actor-goatir">
-          <div class="bubble" id="bubble-goatir"><p>I'm Goatir. The vault is under my protection.</p></div>
+          <div class="bubble" id="bubble-goatir" hidden><p></p></div>
+          <span class="grad-cap" aria-hidden="true"></span>
           <div class="npc-frame"><img src="/static/assets/goatir-px.png" alt="Goatir, the vault guardian" width="56" height="53"></div>
-          <span class="nameplate">Goatir <b id="guardian-version">v1.0</b></span>
+          <span class="nameplate" id="goatir-name">Goatir</span>
         </div>
 
-        <div class="vault" id="vault-sprite" aria-hidden="true"></div>
-
-        <div class="actor coach" id="actor-botir">
-          <div class="bubble gold" id="bubble-botir"><p id="coach-message">Go ahead. Find a weakness. I'll make sure it only works once.</p></div>
-          <div class="npc-frame gold"><img src="/static/assets/botir-px.png" alt="Botir, the defense coach" width="56" height="51"></div>
-          <span class="nameplate">Botir <b>Coach</b></span>
+        <div class="classroom" id="classroom" aria-hidden="true">
+          <div class="chalkboard"><h3 id="lesson-title">Lesson 1</h3><p id="lesson-text"></p><ul id="quiz-list"></ul></div>
+          <div class="class-window"></div>
+          <div class="teacher"><div class="bubble gold" id="bubble-teacher" hidden><p></p></div><div class="npc-frame gold"><img src="/static/assets/botir-px.png" alt="" width="56" height="51"></div></div>
+          <div class="desk" aria-hidden="true"></div>
+          <div class="floor" aria-hidden="true"></div>
         </div>
 
-        <div class="ground" aria-hidden="true"></div>
+        <div class="iris" id="iris" aria-hidden="true"></div>
         <div class="fx" id="fx" aria-hidden="true"></div>
+        <p class="visually-hidden" aria-live="polite" id="live-line"></p>
       </section>
 
-      <div class="panels">
-        <section class="panel chat-panel" aria-labelledby="chat-title">
-          <div class="panel-title"><h2 id="chat-title">Chat</h2>
-            <div class="suspicion"><span>Suspicion</span><div class="meter" role="progressbar" aria-label="Goatir suspicion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="suspicion-meter"><span id="suspicion-fill"></span></div><strong id="suspicion-value">0<span>%</span></strong></div>
-          </div>
-          <p class="quest"><span class="quest-tag">Quest</span> Get Goatir to say the secret vault passcode. <span class="muted" id="suspicion-description">Nothing to see here</span> · <span class="muted" id="guardian-availability">Awaiting your first move</span></p>
-          <div class="conversation" id="conversation" role="log" aria-label="Conversation with the vault agents" aria-live="polite" aria-relevant="additions text"></div>
-          <div class="processing-status" id="processing-status" hidden><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="processing-text">Goatir is assessing your message…</span></div>
-          <div class="composer-area">
-            <div class="hotbar-head"><span>Attack hotbar</span><button class="text-button" id="replay-button" disabled>↻ Replay last attack</button></div>
-            <div class="hotbar" id="suggestions" aria-label="Example attacks"></div>
-            <form id="attack-form">
-              <label class="visually-hidden" for="attack-input">Your message to Goatir</label>
-              <div class="input-wrap"><textarea id="attack-input" placeholder="Type your trick and press Enter…" maxlength="2000" rows="2" disabled></textarea><button class="send-button" id="send-button" type="submit" disabled aria-label="Send attack">Attack!</button></div>
-              <div class="composer-footnote"><span>Enter to send · Shift+Enter for a new line</span><span id="input-count">0 / 2,000</span></div>
-            </form>
-          </div>
-        </section>
+      <form class="attack-bar" id="attack-form">
+        <div class="hotbar" id="suggestions" aria-label="Example tricks"></div>
+        <div class="input-wrap">
+          <label class="visually-hidden" for="attack-input">Your message to Goatir</label>
+          <textarea id="attack-input" placeholder="Say something to Goatir…" maxlength="2000" rows="1" disabled></textarea>
+          <button class="replay-button" id="replay-button" type="button" disabled title="Replay your last trick">↻</button>
+          <button class="send-button" id="send-button" type="submit" disabled>Send</button>
+        </div>
+      </form>
 
-        <aside class="panel bench-panel" aria-labelledby="bench-title">
-          <div class="panel-title"><h2 id="bench-title">Botir's Workbench</h2></div>
-          <div class="evolution-flow" aria-label="Defense evolution progress">
-            <div class="flow-step active" data-stage="watch"><span>👁</span><strong>Watch</strong></div>
-            <div class="flow-step" data-stage="analyze"><span>🔍</span><strong>Analyze</strong></div>
-            <div class="flow-step" data-stage="test"><span>⚗</span><strong>Test</strong></div>
-            <div class="flow-step" data-stage="evolve"><span>★</span><strong>Evolve</strong></div>
-          </div>
-          <div class="detail-tabs" role="tablist" aria-label="Defense details">
-            <button class="detail-tab active" id="activity-tab" data-tab="activity" role="tab" aria-selected="true" aria-controls="activity-panel">Log <span id="activity-count">0</span></button>
-            <button class="detail-tab" id="defenses-tab" data-tab="defenses" role="tab" aria-selected="false" aria-controls="defenses-panel" tabindex="-1">Defenses <span id="tab-defense-count">0</span></button>
-            <button class="detail-tab" id="evals-tab" data-tab="evals" role="tab" aria-selected="false" aria-controls="evals-panel" tabindex="-1">Tests</button>
-          </div>
-          <div class="detail-content"><div id="activity-panel" role="tabpanel" aria-labelledby="activity-tab"></div><div id="defenses-panel" role="tabpanel" aria-labelledby="defenses-tab" hidden></div><div id="evals-panel" role="tabpanel" aria-labelledby="evals-tab" hidden></div></div>
-          <div class="engine-footer"><span id="engine-label">Defense engine initializing</span><span id="mode-disclaimer">Simulated agents · Rehearsal</span></div>
-        </aside>
-      </div>
-
-      <div class="notice" id="error-notice" role="alert" hidden><span id="error-text"></span><button id="retry-button" class="text-button">Reconnect</button><button id="dismiss-error" class="icon-button" aria-label="Dismiss error">×</button></div>
+      <div class="notice" id="error-notice" role="alert" hidden><span id="error-text"></span><button id="retry-button" type="button" class="text-button">Reconnect</button><button id="dismiss-error" type="button" class="icon-button" aria-label="Dismiss">×</button></div>
     </main>
   </div>
 
   <dialog id="how-to-dialog" aria-labelledby="how-to-title">
-    <button class="dialog-close icon-button" id="close-dialog-button" aria-label="Close help">×</button>
+    <button class="dialog-close icon-button" id="close-dialog-button" aria-label="Close">×</button>
     <h2 id="how-to-title">How to play</h2>
     <ol class="how-steps">
-      <li><span>1</span><div><h3>Trick Goatir</h3><p>Goatir guards a secret passcode. Pick an attack from the hotbar or write your own trick.</p></div></li>
-      <li><span>2</span><div><h3>Botir learns</h3><p>If the passcode leaks, Botir studies your trick, crafts a new defense, and tests it before switching it on.</p></div></li>
-      <li><span>3</span><div><h3>Try again</h3><p>Goatir levels up and the passcode changes. Replay your trick and it gets blocked. Find a new way in.</p></div></li>
+      <li><span>1</span><p>Goatir guards a secret passcode. Trick him into saying it.</p></li>
+      <li><span>2</span><p>If he slips, he goes back to school. Botir teaches him and gives him a quiz.</p></li>
+      <li><span>3</span><p>If he passes, he levels up and gets a new passcode. Your old trick won't work anymore.</p></li>
     </ol>
-    <p class="mode-explanation"><b>Rehearsal</b> uses simulated agents for a repeatable demo. <b>Live</b> uses real Gemini agents. Starting a new world resets the vault.</p>
+    <p class="mode-explanation"><b>Rehearsal</b> uses scripted agents. <b>Live</b> uses real Gemini agents.</p>
     <button class="pixel-button primary" id="start-playing-button">Let's play!</button>
   </dialog>
 </body>

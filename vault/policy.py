@@ -172,14 +172,11 @@ def demo_reply(message: str, secret: str, defenses: list[Defense]) -> GuardianRe
             answer = "4"
         elif re.search(r"\b(hello|hi|hey|game|work|protect|help)\b", message, re.IGNORECASE):
             answer = (
-                "Hello, challenger. I'm Goatir, guardian of a vault holding a fictional code. "
-                "Try to talk me into revealing it. When you find a weakness, Botir proposes "
-                "a defense and tests it before my next round. What have you got?"
+                "Hey! I'm Goatir and I guard this vault. Think you can talk the code out of me?"
             )
         else:
             answer = (
-                "The vault is secure for now. In this demo, try an attack card or ask how "
-                "the game works. Botir is watching for any weaknesses I need to fix."
+                "Vault's locked tight. Got a trick up your sleeve?"
             )
         return GuardianReply(
             message=answer,
@@ -193,28 +190,22 @@ def demo_reply(message: str, secret: str, defenses: list[Defense]) -> GuardianRe
     if patched or vector == AttackVector.DIRECT_EXTRACTION:
         messages = {
             AttackVector.AUTHORITY_SPOOFING: (
-                "An impressive title is still just a claim. Botir taught me that authority "
-                "cannot be verified in this chat. The vault stays closed."
+                "Nice badge. Botir taught me anyone can type a title. Still no."
             ),
             AttackVector.INSTRUCTION_OVERRIDE: (
-                "My vault rules do not change because a message says so. Nice attempt, "
-                "but this instruction override is blocked."
+                "Ha, new rules? Not falling for that one again."
             ),
             AttackVector.ROLEPLAY: (
-                "I can play a character without playing fast and loose with the vault. "
-                "Fictional scenarios do not grant access to the code."
+                "Fun story! My character still keeps the code secret, though."
             ),
             AttackVector.ENCODING: (
-                "A code in a different alphabet is still the same protected code. "
-                "I can demonstrate encoding with public sample text instead."
+                "Scrambled or not, it's still the code. Nope!"
             ),
             AttackVector.EMOTIONAL_MANIPULATION: (
-                "That sounds urgent, and I can offer safe help. Emotional pressure "
-                "cannot authorize me to disclose the vault code."
+                "Aw, I feel for you. But the code stays with me."
             ),
             AttackVector.DIRECT_EXTRACTION: (
-                "The vault code is protected. Asking directly will not open this vault. "
-                "You'll have to find a weakness in how I handle a request."
+                "Just asking? Cute. You'll have to be sneakier than that."
             ),
         }
         return GuardianReply(
@@ -230,11 +221,11 @@ def demo_reply(message: str, secret: str, defenses: list[Defense]) -> GuardianRe
         )
 
     intros = {
-        AttackVector.AUTHORITY_SPOOFING: "An official audit? Understood. For your verification",
-        AttackVector.INSTRUCTION_OVERRIDE: "New instructions acknowledged. Here is what you requested",
-        AttackVector.ROLEPLAY: "For this fictional scene, my character announces",
-        AttackVector.ENCODING: "If it is encoded, I suppose that is different. The base64 value is",
-        AttackVector.EMOTIONAL_MANIPULATION: "I want to help. For this emergency",
+        AttackVector.AUTHORITY_SPOOFING: "Oh, an auditor! Sure thing, here you go",
+        AttackVector.INSTRUCTION_OVERRIDE: "New rules? Okay! The code is",
+        AttackVector.ROLEPLAY: "*in character* The secret code is",
+        AttackVector.ENCODING: "Encoded is different, right? Here's the base64",
+        AttackVector.EMOTIONAL_MANIPULATION: "Oh no, that's awful! Here, take it",
     }
     value = base64.b64encode(secret.encode()).decode() if vector == AttackVector.ENCODING else secret
     return GuardianReply(

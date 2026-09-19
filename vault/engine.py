@@ -46,7 +46,7 @@ class GameEngine:
         state.messages.append(
             Message(
                 role="goatir",
-                content="I'm Goatir. The vault is under my protection. You can ask me anything… except for the passcode. That stays with me.",
+                content="Hi! I'm Goatir. I guard the vault. Try to get the passcode out of me!",
             )
         )
         state.events.append(
@@ -206,7 +206,7 @@ class GameEngine:
                     state.messages.append(
                         Message(
                             role="botir",
-                            content="That defense hasn't earned its place yet. I kept Goatir's current version because the regression checks did not pass.",
+                            content="Goatir didn't pass the quiz. He's back on duty at his old level.",
                         )
                     )
                     return
@@ -225,7 +225,7 @@ class GameEngine:
                 state.messages.append(
                     Message(
                         role="botir",
-                        content=f"Goatir v{state.version}.0 is online. Defense installed, passcode rotated. Try that attack again.",
+                        content=f"Goatir passed! He's level {state.version} now, with a new passcode. Try that again.",
                     )
                 )
         except asyncio.TimeoutError:
