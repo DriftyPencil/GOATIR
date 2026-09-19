@@ -60,6 +60,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         else:
             logfire.configure(send_to_logfire=False, console=False)
+        # Trace every Goatir/Botir model call (prompts, structured outputs, tokens) in Logfire.
+        logfire.instrument_pydantic_ai()
         yield
 
     app = FastAPI(title="The Evolving Vault", version="0.1.0", lifespan=lifespan)

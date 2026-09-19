@@ -2,7 +2,7 @@
 
 An adversarial AI game. **Goatir** guards a fictional vault passcode. Try to trick it into leaking the code. When you succeed, **Botir** works out how the attack got through, proposes a new defense, replays your attack plus helpfulness checks against it, and ships the patch only if every check passes. The passcode then rotates, so replaying the same attack fails.
 
-Stack: Python 3.11+, uv, FastAPI, Pydantic / PydanticAI, Gemini, Modal (optional regression runner), Logfire (optional tracing). The frontend is plain HTML/CSS/JS with no framework.
+Stack: Python 3.11+, uv, FastAPI, Pydantic / PydanticAI, Gemini, Modal (regression sandbox and hosting), and Pydantic Logfire (traces every agent call when `LOGFIRE_TOKEN` is set). The frontend is plain HTML/CSS/JS with no framework.
 
 | You get the code | Goatir walks to school |
 |---|---|
