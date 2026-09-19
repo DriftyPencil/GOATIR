@@ -70,6 +70,15 @@ Opt-in live check: `uv run python scripts/check_gemini.py [--game-loop | --list-
 - Live Gemini (`gemini-3.5-flash`, `--game-loop`): real breach → patch v2 with 6/6 live regression checks passed (~7s, local backend) → replay blocked.
 - The Gemini key is in the local, gitignored `.env` only.
 
+## UI: Terraria-style pixel game (2026-09-19, session 3)
+
+- `static/index.html` and `static/styles.css` were rewritten as a pixel-art world: sky, drifting clouds, stepped hills, and grass/dirt/stone tiles. All tiles and sprites are inline SVG; no images were generated.
+- Goatir and Botir use pixelated copies of the supplied portraits (`static/assets/*-px.png`, downscaled with `sips`) shown in NPC frames. The player and the vault door are pixel sprites drawn in `app.js` (`pixelSvg`).
+- Speech bubbles above each character show their latest line, typing dots while an agent works, and a red bubble when the passcode leaks.
+- The HUD shows attacks, breaches, guard level and status. Hearts show vault integrity and blue stars show suspicion. The chat log uses Terraria colors. Example attacks form a numbered hotbar. The right panel is "Botir's Workbench".
+- Effects (`renderScene` in `app.js`): screen shake, blood-moon sky, open vault with gold and a coin burst on breach; "BLOCKED!" and a hit flash on a blocked attack; golden sky, "LEVEL UP!" and sparkles on a patch. Effects fire only on state changes, never on reload, and bubbles dim while big text shows.
+- All element IDs used by the existing logic were kept. Checked on desktop (1280px) and mobile (375px, no horizontal overflow, player bubble hidden on phones). Full rehearsal loop with the Modal runner: breach, patch to v2.0, replay blocked. No console errors.
+
 ## Remaining work
 
 1. Modal backend is still not exercised. It needs `uv run modal setup` and `EVAL_BACKEND=modal`.

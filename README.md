@@ -4,7 +4,9 @@ An adversarial AI game. **Goatir** guards a fictional vault passcode. Try to tri
 
 Stack: Python 3.11+, uv, FastAPI, Pydantic / PydanticAI, Gemini, Modal (optional regression runner), Logfire (optional tracing). The frontend is plain HTML/CSS/JS with no framework.
 
-![Breach patched: Goatir v2.0 deployed](docs/patched.png)
+![Vault breached under a blood moon](docs/breach.png)
+
+![Level up: Goatir v2.0 deployed](docs/patched.png)
 
 | Regression checks | Mobile |
 |---|---|
