@@ -10,6 +10,10 @@ Stack: Python 3.11+, uv, FastAPI, Pydantic / PydanticAI, Gemini, Modal (optional
 | **Botir teaches the lesson** | **Back on duty, one level up** |
 | ![Classroom](docs/classroom.png) | ![Back on duty](docs/back-on-duty.png) |
 
+## Play it online
+
+**https://driftypencil--evolving-vault-web-web.modal.run**
+
 ## Easiest way to run (Mac)
 
 Double-click **`Start Vault.command`**. The game opens in your browser. Close the window to stop it.

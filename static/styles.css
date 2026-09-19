@@ -196,6 +196,8 @@ dialog h2{font:14px var(--pixel);color:var(--gold);text-shadow:2px 2px 0 #000;ma
   .bubble{max-width:62vw;font-size:18px}
   .bubble p{max-height:84px}
   .actor.player .bubble{bottom:calc(100% + 120px);max-width:58vw}
+  .actor.guardian .bubble{left:-8px;--tx:0}.actor.guardian .bubble::after{left:36px}
+  .world.in-class .actor.guardian .bubble{left:auto;right:-8px}.world.in-class .actor.guardian .bubble::after{left:auto;right:30px}
   .actor.coach .bubble{bottom:calc(100% + 150px)}
   .chalkboard{left:4%;width:92%;top:56px;height:150px;padding:8px 10px}
   .chalkboard p{font-size:19px}.chalkboard ul{font-size:16px;columns:1}

@@ -95,7 +95,7 @@ Opt-in live check: `uv run python scripts/check_gemini.py [--game-loop | --list-
 3. README screenshots (`docs/*.png`, captured with Playwright plus the installed Chrome) and a 60-second demo script are done.
 4. Modal is DONE. There are two local profiles: `driftypencil` (active) and `pranavreddy471`. `EVAL_BACKEND=modal` passed a live round on 2026-09-19: 6/6 checks ran in a Modal sandbox and the replay was blocked. The local `.env` now defaults to `modal`.
 5. `Start Vault.command` is a double-click macOS launcher for non-coders. It installs uv if missing, runs the server, and opens the browser.
-6. Public deployment: `deploy/modal_web.py` is written but NOT deployed yet. It needs a Modal secret named `evolving-vault` holding `GEMINI_API_KEY`. The assistant was not permitted to write secrets, so the user creates it (command in the README). Then run `uv run modal deploy deploy/modal_web.py`. It uses one container because sessions are in memory.
+6. Public deployment is DONE (2026-09-19): https://driftypencil--evolving-vault-web-web.modal.run (Modal app `evolving-vault-web`, workspace `driftypencil`). The user created the Modal secret `evolving-vault`. Verified online: a live Gemini round (vault held), and a Rehearsal breach → patch to v2 with checks run in a Modal sandbox from inside the deployed app. No console errors. Redeploy with `uv run modal deploy deploy/modal_web.py`. A redeploy restarts the container and wipes in-memory games; the page shows "Reconnect" and starts a fresh game.
 7. Logfire is optional and still unset (`LOGFIRE_TOKEN`).
 8. Known cosmetic issue: the chat scroll area clips the top message under the mission banner once the chat grows. It's a normal scroll clip, not an overlap bug.
 
