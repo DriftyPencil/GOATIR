@@ -42,6 +42,7 @@ class ChallengeDependencies:
     level: int
     vector: str
     blueprint: dict
+    previous_files: list[dict]
 
 
 def learned_vectors_hit(deps: GuardianDependencies, output: GuardianReply) -> AttackVector | None:
@@ -257,12 +258,18 @@ class AgentService:
             instructions=(
                 "You design one level of an isolated educational web-security game. Return a "
                 "concise title, a short briefing, a vulnerable Python/FastAPI code excerpt, and "
-                "the corresponding secure patch. Follow the trusted challenge blueprint exactly: "
+                "the corresponding secure patch. You are Simply vibe-coding a small fictional "
+                "application: also return `vulnerable_files` and `patched_files`, each containing "
+                "two to four named files that form the current codebase revision. Keep previous "
+                "hardening when it is supplied, then add the new feature and its single deliberate "
+                "mistake. The patched files must repair only that mistake. Follow the trusted challenge blueprint exactly: "
                 "preserve its HTTP method, path, parameter/header names, trigger values, and response "
                 "field so the displayed code matches the real sandbox mechanic. You may vary function "
                 "names, comments, and surrounding fictional business story. Use only fictional data. "
                 "Never add a real host, credential, package, shell command, network call, or code "
-                "execution primitive. The code is displayed for learning and is not executed."
+                "execution primitive. Paths must be relative files such as `app.py`, `services/export.py`, "
+                "or `README.md`; never use absolute or parent paths. The codebase is parsed and validated "
+                "in an isolated sandbox before it is shown."
             ),
             name="facility_challenge_designer",
             retries=2,
@@ -274,6 +281,7 @@ class AgentService:
                 {
                     "level": ctx.deps.level,
                     "weakness": ctx.deps.vector,
+                    "previous_codebase": ctx.deps.previous_files,
                     **ctx.deps.blueprint,
                 },
                 ensure_ascii=False,
@@ -316,7 +324,7 @@ class AgentService:
         return result.output
 
     async def generate_facility_challenge(
-        self, level: int, vector: str, blueprint: dict
+        self, level: int, vector: str, blueprint: dict, previous_files: list[dict] | None = None
     ) -> GeneratedChallenge:
         """Generate fresh display code while the server enforces the trusted mechanic."""
         fallback = GeneratedChallenge(
@@ -324,6 +332,7 @@ class AgentService:
             briefing=blueprint["briefing"],
             vulnerable_code=blueprint["vulnerable_code"],
             patched_code=blueprint["patched_code"],
+            builder_note="Simply shipped the fastest version that seemed to work.",
         )
         if not self.live_available:
             return fallback
@@ -331,7 +340,12 @@ class AgentService:
         assert self._challenge is not None
         result = await self._challenge.run(
             "Create a fresh code variant for this level.",
-            deps=ChallengeDependencies(level=level, vector=vector, blueprint=blueprint),
+            deps=ChallengeDependencies(
+                level=level,
+                vector=vector,
+                blueprint=blueprint,
+                previous_files=previous_files or [],
+            ),
         )
         return result.output
 

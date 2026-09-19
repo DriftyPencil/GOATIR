@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from vault.config import Settings
+from vault.facility import FacilityEngine, _flag
 from vault.main import create_app
 
 
@@ -105,6 +106,22 @@ def test_next_level_starts_with_a_useful_hint_and_patch_code(client):
     assert result["state"]["revealed_hints"]
     assert len(result["state"]["revealed_hints"][0]) > 40
     assert result["state"]["current_challenge"]["level"] == 2
+
+
+def test_sandbox_codebase_starts_vibe_coded_then_records_mr_kaks_patch():
+    engine = FacilityEngine()
+    fac = engine.create()
+    initial = fac.public()["codebase"]
+    assert {file["path"] for file in initial["files"]} >= {"app.py", "web/index.html", "README.md"}
+    assert initial["history"][-1]["author"] == "Simply"
+
+    vector = fac.next_vector()
+    assert vector is not None
+    result = engine.breach(fac, _flag(vector, fac.secret))
+    revised = result["state"]["codebase"]
+    assert result["state"]["last_patch"]["files"]
+    assert any(entry["author"] == "Mr Kak" for entry in revised["history"])
+    assert revised["revision"] == 2
 
 
 def _capture_any(client, sid):

@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, BackgroundTasks, Cookie, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from vault.models import GeneratedChallenge
+from vault.models import CodebaseFile, GeneratedChallenge
 
 if TYPE_CHECKING:
     from vault.agents import AgentService
@@ -260,8 +260,55 @@ def _sign(payload_b64: str, key: bytes) -> str:
     return hmac.new(key, payload_b64.encode(), hashlib.sha256).hexdigest()[:20]
 
 
-def _template_challenge(vector: str) -> GeneratedChallenge:
-    return GeneratedChallenge(**CHALLENGE_BLUEPRINTS[vector])
+def _fallback_files(
+    challenge: GeneratedChallenge, *, patched: bool, previous: list[CodebaseFile] | None = None
+) -> list[CodebaseFile]:
+    """A complete sandbox website revision when live generation is unavailable."""
+    supplied = challenge.patched_files if patched else challenge.vulnerable_files
+    if supplied:
+        return supplied
+    endpoint = challenge.patched_code if patched else challenge.vulnerable_code
+    history = "\n".join(f"- {item.path}: {item.purpose}" for item in (previous or []))
+    return [
+        CodebaseFile(
+            path="app.py",
+            purpose="The sandbox website's FastAPI route for the active feature.",
+            content=endpoint,
+        ),
+        CodebaseFile(
+            path="web/index.html",
+            purpose="A tiny browser page Simply vibe-coded for this sandbox feature.",
+            content=(
+                "<main>\n"
+                f"  <h1>{challenge.title}</h1>\n"
+                "  <p>Simply's experimental sandbox website.</p>\n"
+                "</main>"
+            ),
+        ),
+        CodebaseFile(
+            path="README.md",
+            purpose="Simply's build note and inherited project context.",
+            content=(
+                f"# Sandbox revision\n\n{challenge.builder_note}\n\n"
+                f"Status: {'patched by Mr Kak' if patched else 'first draft'}\n\n"
+                f"Inherited files:\n{history or '- This is the first revision.'}"
+            ),
+        ),
+    ]
+
+
+def _template_challenge(
+    vector: str, previous: list[CodebaseFile] | None = None
+) -> GeneratedChallenge:
+    base = GeneratedChallenge(
+        **CHALLENGE_BLUEPRINTS[vector],
+        builder_note="Simply vibe-coded a working first draft before asking Mr Kak to review it.",
+    )
+    vulnerable_files = _fallback_files(base, patched=False, previous=previous)
+    patched_files = _fallback_files(base, patched=True, previous=vulnerable_files)
+    return base.model_copy(
+        update={"vulnerable_files": vulnerable_files, "patched_files": patched_files}
+    )
 
 
 @dataclass
@@ -277,6 +324,8 @@ class Facility:
     challenge: GeneratedChallenge | None = None
     challenge_source: str = "template"
     challenge_validation: dict | None = None
+    codebase_files: list[CodebaseFile] = field(default_factory=list)
+    codebase_history: list[dict] = field(default_factory=list)
     last_patch: dict | None = None
     log: list[dict] = field(default_factory=list)
     touched: float = field(default_factory=time.monotonic)
@@ -305,6 +354,7 @@ class Facility:
                 "title": self.challenge.title,
                 "briefing": self.challenge.briefing,
                 "vulnerable_code": self.challenge.vulnerable_code.replace("<sid>", self.id),
+                "builder_note": self.challenge.builder_note,
                 "source": self.challenge_source,
                 "validation": self.challenge_validation,
             }
@@ -320,6 +370,11 @@ class Facility:
             ],
             "hardened": not openv,
             "current_challenge": challenge,
+            "codebase": {
+                "revision": len(self.patched) + 1,
+                "files": [file.model_dump() for file in self.codebase_files],
+                "history": self.codebase_history[-12:],
+            },
             "last_patch": self.last_patch,
             "revealed_hints": [HINTS[current][i].replace("<sid>", self.id) for i in range(revealed)]
             if current
@@ -348,6 +403,14 @@ class FacilityEngine:
         current = fac.next_vector()
         if current:
             fac.challenge = _template_challenge(current)
+            fac.codebase_files = list(fac.challenge.vulnerable_files)
+            fac.codebase_history.append(
+                {
+                    "revision": 1,
+                    "author": "Simply",
+                    "summary": fac.challenge.builder_note,
+                }
+            )
         fac.log.append(
             {"kind": "info", "title": "Facility online", "detail": "Simply v1. Find a way in."}
         )
@@ -395,11 +458,31 @@ class FacilityEngine:
             "vector": matched,
             "title": VECTOR_TITLES[matched],
             "code": patch_code,
+            "files": [file.model_dump() for file in _fallback_files(fac.challenge, patched=True)]
+            if current == matched and fac.challenge
+            else [],
         }
+        if current == matched and fac.challenge:
+            fac.codebase_files = _fallback_files(fac.challenge, patched=True)
+            fac.codebase_history.append(
+                {
+                    "revision": len(fac.patched) + 1,
+                    "author": "Mr Kak",
+                    "summary": PATCH_NOTES[matched],
+                }
+            )
         next_vector = fac.next_vector()
         if next_vector:
-            fac.challenge = _template_challenge(next_vector)
+            fac.challenge = _template_challenge(next_vector, fac.codebase_files)
             fac.challenge_source = "template"
+            fac.codebase_files = list(fac.challenge.vulnerable_files)
+            fac.codebase_history.append(
+                {
+                    "revision": len(fac.patched) + 1,
+                    "author": "Simply",
+                    "summary": fac.challenge.builder_note,
+                }
+            )
             # A completed level always hands the player a useful starting clue for
             # the newly unlocked level; further clicks become progressively explicit.
             fac.hints[next_vector] = max(1, fac.hints.get(next_vector, 0))
@@ -443,6 +526,7 @@ def build_facility_router(
         if agents is None or not agents.live_available:
             fac.challenge = _template_challenge(vector)
             fac.challenge_source = "template"
+            fac.codebase_files = list(fac.challenge.vulnerable_files)
             return
         last_error: Exception | None = None
         for _attempt in range(2):
@@ -452,6 +536,7 @@ def build_facility_router(
                         level=len(fac.patched) + 1,
                         vector=vector,
                         blueprint=CHALLENGE_BLUEPRINTS[vector],
+                        previous_files=[file.model_dump() for file in fac.codebase_files],
                     ),
                     timeout=agent_timeout_seconds,
                 )
@@ -475,6 +560,11 @@ def build_facility_router(
                         continue
                 fac.challenge = generated
                 fac.challenge_source = "gemini"
+                fac.codebase_files = _fallback_files(
+                    generated, patched=False, previous=fac.codebase_files
+                )
+                if fac.codebase_history and fac.codebase_history[-1]["author"] == "Simply":
+                    fac.codebase_history[-1]["summary"] = generated.builder_note
                 return
             except Exception as exc:
                 last_error = exc
@@ -484,6 +574,7 @@ def build_facility_router(
             logger.warning("Challenge generation failed (%s)", type(last_error).__name__)
             fac.challenge = _template_challenge(vector)
             fac.challenge_source = "template"
+            fac.codebase_files = list(fac.challenge.vulnerable_files)
             fac.log.append(
                 {
                     "kind": "info",

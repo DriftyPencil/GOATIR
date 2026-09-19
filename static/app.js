@@ -37,6 +37,7 @@
   let facility = null;
   let facilitySid = null;
   let challengeTimer = null;
+  let selectedCodebaseFile = "";
   let activePanel = "social";
   let previousCoins = 0;
 
@@ -694,6 +695,30 @@
     const lastPatch = state.last_patch;
     $("lab-last-patch").hidden = !lastPatch;
     if (lastPatch) $("lab-patch-code").textContent = lastPatch.code;
+    const codebase = state.codebase || { revision: 1, files: [], history: [] };
+    const files = codebase.files || [];
+    if (!files.some((file) => file.path === selectedCodebaseFile)) selectedCodebaseFile = files[0]?.path || "";
+    const fileSelect = $("lab-codebase-files");
+    fileSelect.replaceChildren(...files.map((file) => {
+      const option = document.createElement("option");
+      option.value = file.path;
+      option.textContent = file.path;
+      option.selected = file.path === selectedCodebaseFile;
+      return option;
+    }));
+    fileSelect.disabled = !files.length;
+    const selectedFile = files.find((file) => file.path === selectedCodebaseFile);
+    $("lab-codebase-title").textContent = `Revision ${codebase.revision} · ${selectedFile?.purpose || "sandbox build"}`;
+    $("lab-codebase-origin").textContent = challenge?.source === "gemini" ? "Simply generated" : challenge?.source === "generating" ? "Simply is building…" : "starter build";
+    $("lab-codebase-note").textContent = challenge?.builder_note || "This is the website Simply generated for this run.";
+    $("lab-codebase-content").textContent = selectedFile?.content || "# codebase loading…";
+    $("lab-codebase-history").replaceChildren(...(codebase.history || []).map((entry) => {
+      const item = document.createElement("li");
+      const author = document.createElement("b");
+      author.textContent = `r${entry.revision} · ${entry.author}: `;
+      item.append(author, entry.summary);
+      return item;
+    }));
     clearTimeout(challengeTimer);
     if (challenge?.source === "generating" && facilitySid) {
       const expectedSid = facilitySid;
@@ -869,6 +894,10 @@
   $("replay-button").addEventListener("click", () => { if (session?.last_attack) sendAttack(session.last_attack); });
   $("social-hint-button").addEventListener("click", pullSocialHint);
   $("new-session-button").addEventListener("click", resetCampaign);
+  $("lab-codebase-files").addEventListener("change", (event) => {
+    selectedCodebaseFile = event.target.value;
+    if (facility) renderFacility(facility);
+  });
   $("mode-select").addEventListener("change", () => newSession($("mode-select").value));
   $("lab-agent-form").addEventListener("submit", sendFacilityAgent);
   $("lab-request-form").addEventListener("submit", sendFacilityRequest);

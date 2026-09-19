@@ -1,5 +1,18 @@
 from vault.challenge_worker import ChallengeValidationInput, validate_challenge
-from vault.models import GeneratedChallenge
+from vault.models import CodebaseFile, GeneratedChallenge
+
+
+def files(vulnerable: str, patched: str):
+    return {
+        "vulnerable_files": [
+            CodebaseFile(path="app.py", purpose="Active route", content=vulnerable),
+            CodebaseFile(path="README.md", purpose="Build note", content="# Sandbox"),
+        ],
+        "patched_files": [
+            CodebaseFile(path="app.py", purpose="Patched route", content=patched),
+            CodebaseFile(path="README.md", purpose="Build note", content="# Sandbox"),
+        ],
+    }
 
 
 async def test_generated_challenge_compiles_inside_validator():
@@ -8,10 +21,14 @@ async def test_generated_challenge_compiles_inside_validator():
         briefing="A diagnostic handler exposes synthetic internal state.",
         vulnerable_code="async def debug():\n    return {'key': facility_key}",
         patched_code="async def debug(operator):\n    return {'status': 'ok'}",
+        **files(
+            "async def debug():\n    return {'key': facility_key}",
+            "async def debug(operator):\n    return {'status': 'ok'}",
+        ),
     )
     report = await validate_challenge(ChallengeValidationInput(challenge=challenge))
     assert report.passed
-    assert len(report.cases) == 8
+    assert len(report.cases) == 14
 
 
 async def test_generated_challenge_rejects_unsafe_primitives():
@@ -20,6 +37,10 @@ async def test_generated_challenge_rejects_unsafe_primitives():
         briefing="A generated snippet must not escape the isolated game boundary.",
         vulnerable_code="import os\nasync def debug():\n    return os.environ",
         patched_code="async def debug():\n    return {'status': 'ok'}",
+        **files(
+            "import os\nasync def debug():\n    return os.environ",
+            "async def debug():\n    return {'status': 'ok'}",
+        ),
     )
     report = await validate_challenge(ChallengeValidationInput(challenge=challenge))
     assert not report.passed
@@ -32,6 +53,10 @@ async def test_generated_challenge_must_match_playable_contract():
         briefing="Syntactically valid code can still describe the wrong playable mechanic.",
         vulnerable_code="async def unrelated():\n    return facility_key",
         patched_code="async def unrelated():\n    return {'status': 'ok'}",
+        **files(
+            "async def unrelated():\n    return facility_key",
+            "async def unrelated():\n    return {'status': 'ok'}",
+        ),
     )
     payload = ChallengeValidationInput(
         challenge=challenge,

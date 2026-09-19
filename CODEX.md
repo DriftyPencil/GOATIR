@@ -173,3 +173,10 @@ Opt-in live check: `uv run python scripts/check_gemini.py [--game-loop | --list-
 - The UI shows whether challenge code is still generating, Gemini-generated, or a safe template fallback. The generated source and previous patch are directly inspectable in the Hack Lab.
 - Verified with a real Gemini structured generation for the debug-endpoint level. Test suite: 52 passed; Ruff, JavaScript syntax, and diff checks pass.
 - Deployment cache fix: `/static/`, `/api/`, and `/hack/api/` now return `Cache-Control: no-store`, and the stylesheet/script URLs carry a release version. This prevents new HTML from being paired with the old green Hack Lab CSS or stale Goatir-era JavaScript after a Modal rollout.
+
+## Dynamic sandbox codebase loop (2026-09-19, in progress)
+
+- Scope clarified by the user: the generated application is the sandbox website itself. A run starts with Simply vibe-coding that codebase; the pentester breaks the current build; Mr Kak produces the secured revision; then Simply continues building from the revised project.
+- `GeneratedChallenge` now carries bounded named source files for both the vulnerable and patched revisions. The facility exposes a codebase explorer with a revision number, file picker, content viewer, and author history rather than only a single challenge snippet.
+- The first revision always includes the sandbox backend (`app.py`), a tiny browser page (`web/index.html`), and project context (`README.md`). Each breach records the patch file set and a Mr Kak history event. The next level begins from Simply's next build revision.
+- The Modal validator now rejects generated codebases that lack a bounded, safe relative file set or `app.py`, in addition to the existing syntax, isolation, secret, patch, and route-contract checks.

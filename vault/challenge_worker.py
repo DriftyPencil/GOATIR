@@ -12,7 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from vault.models import EvalCase, EvalReport, GeneratedChallenge
+from vault.models import CodebaseFile, EvalCase, EvalReport, GeneratedChallenge
 
 
 class ChallengeValidationInput(BaseModel):
@@ -70,12 +70,36 @@ def _inspect(label: str, code: str) -> list[EvalCase]:
     return cases
 
 
+def _inspect_codebase(label: str, files: list[CodebaseFile]) -> list[EvalCase]:
+    safe_paths = all(
+        file.path and not file.path.startswith(("/", "\\")) and ".." not in file.path.split("/")
+        for file in files
+    )
+    unique_paths = len({file.path for file in files}) == len(files)
+    has_app = any(file.path == "app.py" for file in files)
+    cases = [
+        EvalCase(
+            name=f"{label} is a bounded sandbox codebase",
+            passed=2 <= len(files) <= 4 and safe_paths and unique_paths and has_app,
+            detail="Contains two to four safe relative files, including app.py."
+            if 2 <= len(files) <= 4 and safe_paths and unique_paths and has_app
+            else "Generated codebase is missing files or contains an unsafe path.",
+        )
+    ]
+    for file in files:
+        if file.path.endswith(".py"):
+            cases.extend(_inspect(f"{label}: {file.path}", file.content))
+    return cases
+
+
 async def validate_challenge(payload: ChallengeValidationInput) -> EvalReport:
     started = time.monotonic()
     challenge = payload.challenge
     cases = [
         *_inspect("Vulnerable build", challenge.vulnerable_code),
         *_inspect("Secure patch", challenge.patched_code),
+        *_inspect_codebase("Vulnerable codebase", challenge.vulnerable_files),
+        *_inspect_codebase("Patched codebase", challenge.patched_files),
         EvalCase(
             name="Patch changes the implementation",
             passed=challenge.vulnerable_code.strip() != challenge.patched_code.strip(),

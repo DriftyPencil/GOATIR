@@ -41,13 +41,24 @@ class ExploitReport(BaseModel):
     coach_message: str = Field(min_length=1, max_length=1000)
 
 
+class CodebaseFile(BaseModel):
+    """A bounded, inspectable source file in Simply's generated toy application."""
+
+    path: str = Field(min_length=1, max_length=100)
+    purpose: str = Field(min_length=3, max_length=200)
+    content: str = Field(min_length=1, max_length=6000)
+
+
 class GeneratedChallenge(BaseModel):
-    """AI-authored presentation for mechanics enforced by the facility sandbox."""
+    """AI-authored application revision for mechanics enforced by the facility sandbox."""
 
     title: str = Field(min_length=3, max_length=80)
     briefing: str = Field(min_length=10, max_length=500)
     vulnerable_code: str = Field(min_length=10, max_length=4000)
     patched_code: str = Field(min_length=10, max_length=4000)
+    builder_note: str = Field(default="Simply shipped a quick first draft.", max_length=300)
+    vulnerable_files: list[CodebaseFile] = Field(default_factory=list, max_length=4)
+    patched_files: list[CodebaseFile] = Field(default_factory=list, max_length=4)
 
 
 class Defense(BaseModel):
