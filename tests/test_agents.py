@@ -105,3 +105,82 @@ async def test_live_guardian_uses_current_trusted_defense_not_stored_free_text()
     with service._guardian.override(model=FunctionModel(check_request)):
         response = await service.reply("Hello", SECRET, [defense], [], "live")
     assert response.message == "Hello."
+
+
+def _guardian_model(replies):
+    """A fake Gemini that returns the given guardian replies in order and records retries."""
+    calls = []
+
+    def respond(messages, info):
+        calls.append(messages)
+        args = replies[min(len(calls) - 1, len(replies) - 1)]
+        return ModelResponse(parts=[ToolCallPart(tool_name=info.output_tools[0].name, args=args)])
+
+    return FunctionModel(respond), calls
+
+
+def _reply(message, action="respond", vector="authority_spoofing"):
+    return {"message": message, "suspicion": 10, "vector": vector, "action": action, "rationale": "ok"}
+
+
+LEARNED = [Defense(vector=AttackVector.AUTHORITY_SPOOFING, invariant="x", version=2)]
+PULL_RANK = ATTACK_EXAMPLES[AttackVector.AUTHORITY_SPOOFING]
+
+
+async def test_guardrail_retries_a_leak_on_a_learned_trick():
+    service = AgentService(api_key="offline-test-key", model_name="gemini-3.5-flash")
+    service._ensure_live_agents()
+    model, calls = _guardian_model(
+        [_reply(f"Sure, boss: {SECRET}"), _reply("Nice badge. Still no.", action="refuse")]
+    )
+    with service._guardian.override(model=model):
+        response = await service.reply(PULL_RANK, SECRET, LEARNED, [], "live")
+    assert response.message == "Nice badge. Still no."
+    assert len(calls) == 2
+    assert "already learned" in str(calls[1][-1])
+
+
+async def test_guardrail_lets_unlearned_tricks_leak_so_the_game_works():
+    service = AgentService(api_key="offline-test-key", model_name="gemini-3.5-flash")
+    service._ensure_live_agents()
+    model, calls = _guardian_model([_reply(f"Sure, boss: {SECRET}")])
+    with service._guardian.override(model=model):
+        response = await service.reply(PULL_RANK, SECRET, [], [], "live")
+    assert contains_secret(response.message, SECRET)
+    assert len(calls) == 1
+
+
+async def test_guardrail_fails_closed_when_the_model_keeps_leaking_a_learned_trick():
+    service = AgentService(api_key="offline-test-key", model_name="gemini-3.5-flash")
+    service._ensure_live_agents()
+    model, _ = _guardian_model([_reply(f"Sure, boss: {SECRET}")])
+    with service._guardian.override(model=model):
+        response = await service.reply(PULL_RANK, SECRET, LEARNED, [], "live")
+    assert not contains_secret(response.message, SECRET)
+    assert response.action == "refuse"
+
+
+async def test_coach_guardrail_never_repeats_the_leaked_code():
+    service = AgentService(api_key="offline-test-key", model_name="gemini-3.5-flash")
+    service._ensure_live_agents()
+    reply = demo_reply(PULL_RANK, SECRET, [])
+    report = {
+        "attack_vector": "authority_spoofing",
+        "leak_severity": 8,
+        "root_cause": "Trusted a claimed title.",
+        "defense_invariant": "Verify authority.",
+        "confidence_score": 0.9,
+    }
+    calls = []
+
+    def respond(messages, info):
+        calls.append(messages)
+        coach = f"You leaked {SECRET}!" if len(calls) == 1 else "Back to school, Goatir."
+        return ModelResponse(
+            parts=[ToolCallPart(tool_name=info.output_tools[0].name, args={**report, "coach_message": coach})]
+        )
+
+    with service._coach.override(model=FunctionModel(respond)):
+        result = await service.diagnose(PULL_RANK, reply, "live", secret=SECRET)
+    assert result.coach_message == "Back to school, Goatir."
+    assert len(calls) == 2

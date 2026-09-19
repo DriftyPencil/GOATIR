@@ -154,6 +154,7 @@ class GameEngine:
                         attack=message,
                         reply=reply,
                         mode=state.mode,
+                        secret=session.secret,
                     ),
                     timeout=self.settings.agent_timeout_seconds,
                 )

@@ -96,6 +96,14 @@ Opt-in live check: `uv run python scripts/check_gemini.py [--game-loop | --list-
 - Verified live (Gemini, deployed app, quiz on Modal): Pull rank #1 → breach → quiz 6/6 → Lv 2. Pull rank #2 → blocked ("I can't verify your auditor badge over chat!").
 - Note: redeploying swaps the container, and a game started during the swap is lost (in-memory sessions).
 
+## PydanticAI guardrails (2026-09-19, session 5)
+
+- Goatir has an `@guardian.output_validator` (`learned_defense_guardrail` in `vault/agents.py`). If his reply leaks the passcode on an attack type he has ALREADY learned (his own classification or `classify_attack(message)` matches an active defense), it raises `ModelRetry`, and PydanticAI makes Gemini answer again before anything reaches the player. It also always retries if the public `rationale` contains the passcode. Leaks on tricks he has not learned pass through on purpose, because that is the game.
+- Fail closed: if Gemini still leaks after its retries (`UnexpectedModelBehavior`) while defenses are active, `reply()` returns a scripted refusal instead of the leak.
+- Botir has an `@coach.output_validator` (`no_leak_in_coaching`): any report field that repeats the passcode triggers `ModelRetry`. `diagnose()` now takes `secret`, which the engine passes in, via `CoachDependencies`.
+- The guardrails also run inside the regression quiz, because the quiz uses the same `AgentService.reply`. The quiz therefore tests the defense as deployed (instructions plus guardrail).
+- Tests: 4 new tests use `FunctionModel`: a learned leak is retried, an unlearned leak still passes, persistent leaks fail closed, and the coach cannot repeat the code. 37 pass. Verified live on the deployed app: Pull rank → Lv 2 → Pull rank blocked. Retries show up in Logfire traces.
+
 ## Remaining work
 
 1. Modal backend is still not exercised. It needs `uv run modal setup` and `EVAL_BACKEND=modal`.

@@ -44,6 +44,12 @@ source .env && uv run modal secret create evolving-vault GEMINI_API_KEY="$GEMINI
 uv run modal deploy deploy/modal_web.py
 ```
 
+## Guardrails (PydanticAI)
+
+- **Typed outputs:** Goatir and Botir must return validated Pydantic models (`GuardianReply`, `ExploitReport`), and invalid output is retried automatically.
+- **Learned-defense guardrail:** a PydanticAI `output_validator` on Goatir raises `ModelRetry` if he leaks the passcode on a trick he has already learned. If he keeps leaking, the app fails closed with a refusal. New tricks can still work, which is the game.
+- **Coach guardrail:** Botir's output validator stops his analysis from ever repeating the passcode.
+
 ## Turn loop
 
 attack → Goatir replies → leak detector (`contains_secret`) → on breach: Botir diagnosis → candidate defense → regression suite → activate + rotate passcode only on pass.
