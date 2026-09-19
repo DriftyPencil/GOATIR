@@ -1,6 +1,6 @@
 # Evolving Vault — project handoff
 
-Last updated: 2026-09-19. This file records implementation progress and next steps so work can continue across sessions.
+Last updated: 2026-09-19 (session 2). This file records implementation progress and next steps so work can continue across sessions.
 
 ## User requirements
 
@@ -37,7 +37,9 @@ Last updated: 2026-09-19. This file records implementation progress and next ste
 - Added shared typed models in `vault/models.py` and configuration in `vault/config.py`.
 - Added session state machine in `vault/engine.py` and HTTP routes in `vault/main.py`.
 - Copied user-supplied portraits unchanged into `static/assets/goatir.png` and `static/assets/botir.png`.
-- Parallel work is underway on the frontend, agent policies, and evaluation runner.
+- Frontend (`static/`), agent service (`vault/agents.py`), deterministic policy (`vault/policy.py`), and local/Modal evaluation (`vault/evaluation.py`, `vault/eval_worker.py`) are complete and integrated.
+- Added `README.md`. Added `[tool.logfire] ignore_no_config` to silence a test warning.
+- Default model changed from `gemini-2.5-flash` to `gemini-3.5-flash`. On 2026-09-19 the 2.5 model returned HTTP 404 for generateContent even though it still appears in the model list. `gemini-flash-latest` also works.
 
 ## API contract
 
@@ -57,16 +59,22 @@ uv run pytest
 uv run ruff check .
 ```
 
-These commands are the intended workflow; application tests have not yet run at this checkpoint because parallel modules are still being completed.
+Opt-in live check: `uv run python scripts/check_gemini.py [--game-loop | --list-models | --model NAME]`.
 
-## Remaining work at this checkpoint
+## Verification results (2026-09-19, second session, on Pranav's machine at `~/Hackathons/GOATIR`)
 
-1. Complete and integrate frontend, agent service/policy, and local/Modal evaluation workers.
-2. Test complete rehearsal breach → patch → replay loop and error paths.
-3. Exercise a real Gemini request with the existing `.env` key; report actual model access/quota results without revealing the key.
-4. Visually verify desktop and mobile UI, using the supplied artwork only.
-5. Add concise README and refresh this handoff with exact final test results and limitations.
-6. Initialize Git if possible, verify secrets are ignored, and leave ready for a later commit/push. No remote URL has been provided.
+- `uv run pytest`: 32 passed. `uv run ruff check .`: clean.
+- Rehearsal UI, driven in a browser: breach → Botir diagnosis → 6/6 regression checks → v2.0 deployed. Replaying the same attack was blocked, with no console errors.
+- API error paths: live mode with no key returns 400, unknown session 404, concurrent attack 409, empty message 422.
+- Mobile at 375px: no horizontal overflow, and the session survives a reload.
+- Live Gemini (`gemini-3.5-flash`, `--game-loop`): real breach → patch v2 with 6/6 live regression checks passed (~7s, local backend) → replay blocked.
+- The Gemini key is in the local, gitignored `.env` only.
+
+## Remaining work
+
+1. Modal backend is still not exercised. It needs `uv run modal setup` and `EVAL_BACKEND=modal`.
+2. Live mode clicked through in the browser UI: a roleplay attack was refused by Gemini, with no errors. Added an inline SVG favicon to stop a favicon.ico 404.
+3. Optional: Logfire token, deployment, and a demo script or screenshots for judging.
 
 ## Known scope limits
 

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr = Field(
         default=SecretStr(""), validation_alias=AliasChoices("GEMINI_API_KEY", "GOOGLE_API_KEY")
     )
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.5-flash"
     eval_backend: Literal["local", "modal"] = "local"
     logfire_token: SecretStr = SecretStr("")
     modal_token_id: str = ""

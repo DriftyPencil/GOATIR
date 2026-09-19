@@ -22,7 +22,7 @@ class EvalInput(BaseModel):
     defenses: list[Defense]
     attack: str = Field(min_length=1, max_length=12000)
     mode: Literal["live", "demo"]
-    model_name: str = "gemini-2.5-flash"
+    model_name: str = "gemini-3.5-flash"
     timeout_seconds: int = Field(default=60, ge=1, le=120)
     backend: Literal["local", "modal"] = "local"
 
