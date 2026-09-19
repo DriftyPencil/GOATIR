@@ -74,7 +74,9 @@ Opt-in live check: `uv run python scripts/check_gemini.py [--game-loop | --list-
 
 1. Modal backend is still not exercised. It needs `uv run modal setup` and `EVAL_BACKEND=modal`.
 2. Live mode clicked through in the browser UI: a roleplay attack was refused by Gemini, with no errors. Added an inline SVG favicon to stop a favicon.ico 404.
-3. Optional: Logfire token, deployment, and a demo script or screenshots for judging.
+3. README screenshots (`docs/*.png`, captured with Playwright plus the installed Chrome) and a 60-second demo script are done.
+4. Blocked on the user's accounts: Modal (`uv run modal setup` needs browser login; no `~/.modal.toml` exists), Logfire (`LOGFIRE_TOKEN`), and any public deployment. Everything else is complete.
+5. Known cosmetic issue: the chat scroll area clips the top message under the mission banner once the chat grows. It's a normal scroll clip, not an overlap bug.
 
 ## Known scope limits
 

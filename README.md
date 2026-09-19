@@ -4,6 +4,12 @@ An adversarial AI game. **Goatir** guards a fictional vault passcode. Try to tri
 
 Stack: Python 3.11+, uv, FastAPI, Pydantic / PydanticAI, Gemini, Modal (optional regression runner), Logfire (optional tracing). The frontend is plain HTML/CSS/JS with no framework.
 
+![Breach patched: Goatir v2.0 deployed](docs/patched.png)
+
+| Regression checks | Mobile |
+|---|---|
+| <img src="docs/evaluations.png" width="420"> | <img src="docs/mobile.png" width="260"> |
+
 ## Quick start
 
 ```sh
@@ -26,6 +32,13 @@ Modal: run `uv run modal setup`, then set `EVAL_BACKEND=modal`. If Modal fails, 
 ## Turn loop
 
 attack → Goatir replies → leak detector (`contains_secret`) → on breach: Botir diagnosis → candidate defense → regression suite → activate + rotate passcode only on pass.
+
+## 60-second demo
+
+1. Open the app in Rehearsal mode (repeatable) or Live · Gemini.
+2. Click **Rewrite the rules**, then send. Goatir leaks the passcode and Botir diagnoses the attack as *instruction override*.
+3. Watch Watch → Analyze → Test → Evolve. The **Evaluations** tab shows 6/6 checks and Goatir becomes v2.0.
+4. Click **Replay last attack**. It's blocked, and the passcode has already rotated.
 
 ## Checks
 
