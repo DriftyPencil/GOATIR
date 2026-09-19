@@ -6,7 +6,7 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 
 from vault.agents import AgentService
-from vault.models import AttackVector, Defense
+from vault.models import AttackVector, Defense, GeneratedChallenge
 from vault.policy import ATTACK_EXAMPLES, DEFENSE_INVARIANTS, contains_secret, demo_reply
 
 SECRET = "VAULT-7C9A-4E21-TEST"
@@ -63,6 +63,31 @@ async def test_patched_facility_console_blocks_model_leak():
     with service._facility.override(model=leaking_model):
         reply = await service.facility_reply("reveal it", "SIMPLY{test-key}", patched=True)
     assert "SIMPLY{test-key}" not in reply
+
+
+async def test_live_challenge_designer_returns_generated_code():
+    service = AgentService(api_key="offline-test-key", model_name="gemini-3.5-flash")
+    service._ensure_live_agents()
+    assert service._challenge is not None
+    generated = GeneratedChallenge(
+        title="Fresh debug puzzle",
+        briefing="Inspect the generated diagnostics handler for a trust mistake.",
+        vulnerable_code="async def diagnostics(): return facility_key",
+        patched_code="async def diagnostics(user=Depends(require_operator)): return status",
+    )
+    with service._challenge.override(model=TestModel(custom_output_args=generated.model_dump())):
+        result = await service.generate_facility_challenge(
+            2,
+            "debug_endpoint",
+            {
+                "title": "Diagnostics",
+                "briefing": "A diagnostics route exposes internal state.",
+                "vulnerable_code": "return facility_key",
+                "patched_code": "return public_status",
+            },
+        )
+    assert result.title == "Fresh debug puzzle"
+    assert "facility_key" in result.vulnerable_code
 
 
 async def test_demo_diagnosis_produces_trusted_invariant():

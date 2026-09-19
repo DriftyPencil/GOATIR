@@ -47,7 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.middleware("http")
     async def response_headers(request: Request, call_next):
         response = await call_next(request)
-        if request.url.path.startswith("/api/"):
+        if request.url.path.startswith(("/api/", "/hack/api/", "/static/")):
             response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"
@@ -127,6 +127,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             FacilityEngine(),
             engine.agents,
             agent_timeout_seconds=config.agent_timeout_seconds,
+            settings=config,
         )
     )
     app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")

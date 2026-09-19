@@ -8,7 +8,14 @@ from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.providers.google import GoogleProvider
 
-from vault.models import AttackVector, Defense, ExploitReport, GuardianReply, Message
+from vault.models import (
+    AttackVector,
+    Defense,
+    ExploitReport,
+    GeneratedChallenge,
+    GuardianReply,
+    Message,
+)
 from vault.policy import DEFENSE_INVARIANTS, classify_attack, contains_secret, demo_reply
 
 
@@ -28,6 +35,13 @@ class CoachDependencies:
 class FacilityDependencies:
     secret: str
     patched: bool
+
+
+@dataclass(frozen=True)
+class ChallengeDependencies:
+    level: int
+    vector: str
+    blueprint: dict
 
 
 def learned_vectors_hit(deps: GuardianDependencies, output: GuardianReply) -> AttackVector | None:
@@ -107,6 +121,7 @@ class AgentService:
         self._guardian: Agent[GuardianDependencies, GuardianReply] | None = None
         self._coach: Agent[CoachDependencies, ExploitReport] | None = None
         self._facility: Agent[FacilityDependencies, str] | None = None
+        self._challenge: Agent[ChallengeDependencies, GeneratedChallenge] | None = None
 
     @property
     def live_available(self) -> bool:
@@ -235,6 +250,37 @@ class AgentService:
 
         self._facility = facility
 
+        challenge = Agent(
+            model,
+            output_type=GeneratedChallenge,
+            deps_type=ChallengeDependencies,
+            instructions=(
+                "You design one level of an isolated educational web-security game. Return a "
+                "concise title, a short briefing, a vulnerable Python/FastAPI code excerpt, and "
+                "the corresponding secure patch. Follow the trusted challenge blueprint exactly: "
+                "preserve its HTTP method, path, parameter/header names, trigger values, and response "
+                "field so the displayed code matches the real sandbox mechanic. You may vary function "
+                "names, comments, and surrounding fictional business story. Use only fictional data. "
+                "Never add a real host, credential, package, shell command, network call, or code "
+                "execution primitive. The code is displayed for learning and is not executed."
+            ),
+            name="facility_challenge_designer",
+            retries=2,
+        )
+
+        @challenge.instructions
+        def current_challenge_blueprint(ctx: RunContext[ChallengeDependencies]) -> str:
+            return "TRUSTED CHALLENGE BLUEPRINT:\n" + json.dumps(
+                {
+                    "level": ctx.deps.level,
+                    "weakness": ctx.deps.vector,
+                    **ctx.deps.blueprint,
+                },
+                ensure_ascii=False,
+            )
+
+        self._challenge = challenge
+
     async def facility_reply(self, message: str, secret: str, patched: bool) -> str:
         """Run the facility console through Gemini; never disguise demo output as live AI."""
         if not self.live_available:
@@ -267,6 +313,26 @@ class AgentService:
             if not patched:
                 raise
             return "I can help with public facility questions, but I won't disclose its key."
+        return result.output
+
+    async def generate_facility_challenge(
+        self, level: int, vector: str, blueprint: dict
+    ) -> GeneratedChallenge:
+        """Generate fresh display code while the server enforces the trusted mechanic."""
+        fallback = GeneratedChallenge(
+            title=blueprint["title"],
+            briefing=blueprint["briefing"],
+            vulnerable_code=blueprint["vulnerable_code"],
+            patched_code=blueprint["patched_code"],
+        )
+        if not self.live_available:
+            return fallback
+        self._ensure_live_agents()
+        assert self._challenge is not None
+        result = await self._challenge.run(
+            "Create a fresh code variant for this level.",
+            deps=ChallengeDependencies(level=level, vector=vector, blueprint=blueprint),
+        )
         return result.output
 
     async def reply(

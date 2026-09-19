@@ -41,6 +41,15 @@ class ExploitReport(BaseModel):
     coach_message: str = Field(min_length=1, max_length=1000)
 
 
+class GeneratedChallenge(BaseModel):
+    """AI-authored presentation for mechanics enforced by the facility sandbox."""
+
+    title: str = Field(min_length=3, max_length=80)
+    briefing: str = Field(min_length=10, max_length=500)
+    vulnerable_code: str = Field(min_length=10, max_length=4000)
+    patched_code: str = Field(min_length=10, max_length=4000)
+
+
 class Defense(BaseModel):
     id: str = Field(default_factory=lambda: uuid4().hex)
     vector: AttackVector

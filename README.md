@@ -20,6 +20,14 @@ Everything now lives on `/` and shares one animated progression loop:
 
 The aim is simple: **break Simply's vault, earn coins, and make the system stronger**. The number and names of open weaknesses are deliberately hidden. Ask for a hint to reveal one useful clue at a time. Every confirmed breakthrough earns a coin, sends Simply to Mr Kak for an animated lesson, installs a real session-scoped patch, and reveals more of the system map. `/hack` redirects into the facility panel on the same page.
 
+Each facility session shuffles its challenge order. In Live mode, Gemini writes a fresh
+vulnerable code excerpt and secure patch for every level from a server-owned challenge
+blueprint. A network-blocked Modal sandbox parses, compiles, and inspects both versions
+before publication; the web process never imports arbitrary model code, and FastAPI
+enforces the matching mechanic. After a breakthrough, level two and later begin
+with a useful clue already revealed. Asking again makes that clue progressively more
+specific until it provides an exact request to try.
+
 ## Play it online
 
 **https://driftypencil--evolving-vault-web-web.modal.run**
@@ -47,6 +55,10 @@ Open http://127.0.0.1:8000. With no key, only **Rehearsal mode** is available. I
 
 Facility-console responses include `source` and `model` fields, so the built-in request
 console shows whether a reply came from Gemini or the offline rehearsal.
+
+Generated challenge cards show **Gemini · Modal verified** only after the vulnerable
+snippet and its patch pass the isolated challenge validator. If generation or validation
+fails, the level stays playable with a clearly marked safe template.
 
 Modal: run `uv run modal setup`, then set `EVAL_BACKEND=modal`. If Modal fails, the patch is withheld. It never silently falls back.
 

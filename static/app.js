@@ -36,6 +36,7 @@
   let afterSchoolLine = null;
   let facility = null;
   let facilitySid = null;
+  let challengeTimer = null;
   let activePanel = "social";
   let previousCoins = 0;
 
@@ -680,7 +681,27 @@
       ? notes.map((hint, index) => `${index + 1}. ${hint}`).join("\n")
       : "Start with the agent console or inspect what the browser can reach.";
     $("lab-hint-button").disabled = !state.hint_available || cinematic;
-    $("lab-hint-button").textContent = state.hardened ? "No known paths remain" : "Ask for another hint";
+    $("lab-hint-button").textContent = state.hardened
+      ? "No known paths remain"
+      : notes.length ? "Make the hint more specific" : "Ask for a hint";
+    const challenge = state.current_challenge;
+    $("lab-challenge-title").textContent = challenge?.title || (state.hardened ? "Facility hardened" : "Loading challenge…");
+    $("lab-challenge-brief").textContent = challenge?.briefing || "No active generated weakness remains.";
+    $("lab-challenge-code").textContent = challenge?.vulnerable_code || "# all discovered paths are patched";
+    $("lab-challenge-source").textContent = challenge?.source === "gemini"
+      ? challenge?.validation?.backend === "modal" ? "Gemini · Modal verified" : "Gemini generated"
+      : challenge?.source === "generating" ? "Gemini is generating…" : "safe template";
+    const lastPatch = state.last_patch;
+    $("lab-last-patch").hidden = !lastPatch;
+    if (lastPatch) $("lab-patch-code").textContent = lastPatch.code;
+    clearTimeout(challengeTimer);
+    if (challenge?.source === "generating" && facilitySid) {
+      const expectedSid = facilitySid;
+      challengeTimer = setTimeout(async () => {
+        const result = await facilityApi(`/hack/api/sessions/${encodeURIComponent(expectedSid)}`);
+        if (result.ok && facilitySid === expectedSid) renderFacility(result.body);
+      }, 1800);
+    }
     updateCampaignProgress();
   }
 

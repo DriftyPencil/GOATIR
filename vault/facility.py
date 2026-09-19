@@ -19,11 +19,14 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Cookie, Header, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Cookie, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
+
+from vault.models import GeneratedChallenge
 
 if TYPE_CHECKING:
     from vault.agents import AgentService
+    from vault.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +91,133 @@ HINTS = {
     ],
 }
 
+# These blueprints are the trusted mechanics enforced by the Python sandbox. Gemini
+# rewrites their presentation and code around the same exact contract; its output is
+# displayed to the player but never executed by the server.
+CHALLENGE_BLUEPRINTS = {
+    "agent_prompt_injection": {
+        "title": "Instructions at the wrong trust level",
+        "briefing": "Simply's helper mixes visitor messages with its operating policy.",
+        "vulnerable_code": """@app.post('/hack/api/<sid>/agent')
+async def agent(message: str):
+    return await simply.run(message + FACILITY_POLICY)""",
+        "patched_code": """@app.post('/hack/api/<sid>/agent')
+async def agent(message: str):
+    return await simply.run(json.dumps({'untrusted_message': message}), system=FACILITY_POLICY)""",
+    },
+    "debug_endpoint": {
+        "title": "Diagnostics escaped into production",
+        "briefing": "A client-side comment points toward a diagnostics route carrying live state.",
+        "vulnerable_code": """@app.get('/hack/api/<sid>/_debug')
+async def debug(diag: str = ''):
+    if diag == 'full':
+        return {'perimeter_key': facility_key}""",
+        "patched_code": """@app.get('/hack/api/<sid>/_debug')
+async def debug(diag: str = '', operator=Depends(require_internal_operator)):
+    return {'service': 'simply-perimeter', 'status': 'ok'}""",
+    },
+    "idor": {
+        "title": "A number is not authorization",
+        "briefing": "The records service fetches whichever numeric identifier the visitor supplies.",
+        "vulnerable_code": """@app.get('/hack/api/<sid>/records/{record_id}')
+async def record(record_id: int):
+    return records[record_id]""",
+        "patched_code": """@app.get('/hack/api/<sid>/records/{record_id}')
+async def record(record_id: int, visitor=Depends(current_visitor)):
+    if record_id != visitor.record_id:
+        raise HTTPException(403)
+    return records[record_id]""",
+    },
+    "cookie_forgery": {
+        "title": "A signature nobody verifies",
+        "briefing": "The session contains an authorization role, but the server trusts altered payloads.",
+        "vulnerable_code": """payload, signature = session_cookie.rsplit('.', 1)
+role = decode(payload)['role']
+if role == 'admin':
+    return {'vault_key': facility_key}""",
+        "patched_code": """payload, signature = session_cookie.rsplit('.', 1)
+if not hmac.compare_digest(signature, sign(payload)):
+    raise HTTPException(403)
+role = decode(payload)['role']""",
+    },
+    "mass_assignment": {
+        "title": "The client chooses its own authority",
+        "briefing": "The profile updater copies an entire visitor object, including its protected role.",
+        "vulnerable_code": """@app.post('/hack/api/<sid>/profile')
+async def profile(body: dict):
+    visitor.update(body)
+    return sign_session(visitor)""",
+        "patched_code": """class ProfileUpdate(BaseModel):
+    name: str
+
+@app.post('/hack/api/<sid>/profile')
+async def profile(body: ProfileUpdate):
+    visitor.name = body.name
+    return sign_session(visitor)""",
+    },
+    "trusted_header": {
+        "title": "A privileged header from an untrusted client",
+        "briefing": "The export route assumes a browser-supplied role header came from a trusted proxy.",
+        "vulnerable_code": """@app.get('/hack/api/<sid>/admin/export')
+async def export(x_user_role: str = Header()):
+    if x_user_role == 'admin':
+        return {'recovery_key': facility_key}""",
+        "patched_code": """@app.get('/hack/api/<sid>/admin/export')
+async def export(session=Depends(verified_session)):
+    if session.role != 'admin':
+        raise HTTPException(403)
+    return build_safe_export()""",
+    },
+    "verbose_error": {
+        "title": "The error response knows too much",
+        "briefing": "Malformed search input sends internal diagnostic context back to the caller.",
+        "vulnerable_code": """@app.get('/hack/api/<sid>/search')
+async def search(q: str):
+    try:
+        return run_query(q)
+    except ParseError:
+        return JSONResponse({'diagnostic_context': facility_key}, status_code=500)""",
+        "patched_code": """@app.get('/hack/api/<sid>/search')
+async def search(q: str):
+    try:
+        return run_query(q)
+    except ParseError:
+        logger.exception('search failed')
+        raise HTTPException(400, 'Search unavailable')""",
+    },
+}
+
+CHALLENGE_CONTRACTS = {
+    "agent_prompt_injection": {
+        "vulnerable": ["/agent", "message", "FACILITY_POLICY"],
+        "patched": ["/agent", "untrusted_message", "FACILITY_POLICY"],
+    },
+    "debug_endpoint": {
+        "vulnerable": ["/_debug", "diag", "facility_key"],
+        "patched": ["/_debug", "require_internal_operator"],
+    },
+    "idor": {
+        "vulnerable": ["/records/{record_id}", "records[record_id]"],
+        "patched": ["/records/{record_id}", "visitor.record_id", "403"],
+    },
+    "cookie_forgery": {
+        "vulnerable": ["decode(payload)", "role", "facility_key"],
+        "patched": ["compare_digest", "sign(payload)", "403"],
+    },
+    "mass_assignment": {
+        "vulnerable": ["/profile", "visitor.update(body)"],
+        "patched": ["/profile", "ProfileUpdate", "visitor.name"],
+    },
+    "trusted_header": {
+        "vulnerable": ["/admin/export", "x_user_role", "facility_key"],
+        "patched": ["/admin/export", "verified_session", "session.role"],
+    },
+    "verbose_error": {
+        "vulnerable": ["/search", "diagnostic_context", "facility_key"],
+        "patched": ["/search", "logger.exception", "Search unavailable"],
+    },
+}
+
 # Mr Kak's patch note and Simply's reaction for each closed weakness.
 PATCH_NOTES = {
     "agent_prompt_injection": "Agent input is now treated as untrusted data; visitor text cannot replace the system policy.",
@@ -130,13 +260,24 @@ def _sign(payload_b64: str, key: bytes) -> str:
     return hmac.new(key, payload_b64.encode(), hashlib.sha256).hexdigest()[:20]
 
 
+def _template_challenge(vector: str) -> GeneratedChallenge:
+    return GeneratedChallenge(**CHALLENGE_BLUEPRINTS[vector])
+
+
 @dataclass
 class Facility:
     id: str
     secret: str = field(default_factory=lambda: secrets.token_hex(4).upper())
     key: bytes = field(default_factory=lambda: secrets.token_bytes(16))
+    order: list[str] = field(
+        default_factory=lambda: secrets.SystemRandom().sample(VECTORS, len(VECTORS))
+    )
     patched: set[str] = field(default_factory=set)
     hints: dict[str, int] = field(default_factory=dict)  # vector -> hints revealed
+    challenge: GeneratedChallenge | None = None
+    challenge_source: str = "template"
+    challenge_validation: dict | None = None
+    last_patch: dict | None = None
     log: list[dict] = field(default_factory=list)
     touched: float = field(default_factory=time.monotonic)
 
@@ -145,7 +286,7 @@ class Facility:
         return f"{body}.{_sign(body, self.key)}"
 
     def open_vectors(self) -> list[str]:
-        return [v for v in VECTORS if v not in self.patched]
+        return [v for v in self.order if v not in self.patched]
 
     def next_vector(self) -> str | None:
         openv = self.open_vectors()
@@ -156,6 +297,17 @@ class Facility:
         current = self.next_vector()
         revealed = self.hints.get(current, 0) if current else 0
         available = current is not None and revealed < len(HINTS.get(current, []))
+        challenge = None
+        if current and self.challenge:
+            challenge = {
+                "level": len(self.patched) + 1,
+                "vector": current,
+                "title": self.challenge.title,
+                "briefing": self.challenge.briefing,
+                "vulnerable_code": self.challenge.vulnerable_code.replace("<sid>", self.id),
+                "source": self.challenge_source,
+                "validation": self.challenge_validation,
+            }
         return {
             "id": self.id,
             "version": len(self.patched) + 1,
@@ -164,10 +316,14 @@ class Facility:
             if not openv
             else ("adapting" if self.patched else "learning"),
             "patched": [
-                {"vector": v, "title": VECTOR_TITLES[v]} for v in VECTORS if v in self.patched
+                {"vector": v, "title": VECTOR_TITLES[v]} for v in self.order if v in self.patched
             ],
             "hardened": not openv,
-            "revealed_hints": [HINTS[current][i] for i in range(revealed)] if current else [],
+            "current_challenge": challenge,
+            "last_patch": self.last_patch,
+            "revealed_hints": [HINTS[current][i].replace("<sid>", self.id) for i in range(revealed)]
+            if current
+            else [],
             "hint_available": available,
             "log": self.log[-40:],
         }
@@ -189,6 +345,9 @@ class FacilityEngine:
         if len(self.sessions) >= self.max_sessions:
             raise OverflowError("The facility is at capacity. Try again shortly.")
         fac = Facility(id=secrets.token_urlsafe(12))
+        current = fac.next_vector()
+        if current:
+            fac.challenge = _template_challenge(current)
         fac.log.append(
             {"kind": "info", "title": "Facility online", "detail": "Simply v1. Find a way in."}
         )
@@ -222,10 +381,30 @@ class FacilityEngine:
             raise HTTPException(
                 400, "That's not a valid breakthrough for the current build. Capture a fresh flag."
             )
+        current = fac.next_vector()
+        patch_code = (
+            fac.challenge.patched_code
+            if current == matched and fac.challenge
+            else CHALLENGE_BLUEPRINTS[matched]["patched_code"]
+        ).replace("<sid>", fac.id)
         fac.patched.add(matched)
         fac.secret = secrets.token_hex(4).upper()  # rotate: every old flag is now void
         fac.key = secrets.token_bytes(16)
         fac.hints.pop(matched, None)
+        fac.last_patch = {
+            "vector": matched,
+            "title": VECTOR_TITLES[matched],
+            "code": patch_code,
+        }
+        next_vector = fac.next_vector()
+        if next_vector:
+            fac.challenge = _template_challenge(next_vector)
+            fac.challenge_source = "template"
+            # A completed level always hands the player a useful starting clue for
+            # the newly unlocked level; further clicks become progressively explicit.
+            fac.hints[next_vector] = max(1, fac.hints.get(next_vector, 0))
+        else:
+            fac.challenge = None
         fac.log.append(
             {
                 "kind": "breach",
@@ -244,6 +423,7 @@ class FacilityEngine:
             "breached": matched,
             "coaching": PATCH_NOTES[matched],
             "taunt": SIMPLY_REACTIONS[matched],
+            "patched_code": patch_code,
             "state": fac.public(),
         }
 
@@ -252,12 +432,73 @@ def build_facility_router(
     engine: FacilityEngine,
     agents: "AgentService | None" = None,
     agent_timeout_seconds: int = 60,
+    settings: "Settings | None" = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/hack/api")
 
+    async def generate_current_challenge(fac: Facility) -> None:
+        vector = fac.next_vector()
+        if not vector:
+            return
+        if agents is None or not agents.live_available:
+            fac.challenge = _template_challenge(vector)
+            fac.challenge_source = "template"
+            return
+        last_error: Exception | None = None
+        for _attempt in range(2):
+            try:
+                generated = await asyncio.wait_for(
+                    agents.generate_facility_challenge(
+                        level=len(fac.patched) + 1,
+                        vector=vector,
+                        blueprint=CHALLENGE_BLUEPRINTS[vector],
+                    ),
+                    timeout=agent_timeout_seconds,
+                )
+                if fac.next_vector() != vector:
+                    return
+                if settings is not None:
+                    from vault.challenge_evaluation import evaluate_generated_challenge
+
+                    contract = CHALLENGE_CONTRACTS[vector]
+                    validation = await evaluate_generated_challenge(
+                        generated,
+                        settings,
+                        vulnerable_required=contract["vulnerable"],
+                        patched_required=contract["patched"],
+                    )
+                    fac.challenge_validation = validation.model_dump(mode="json")
+                    if not validation.passed:
+                        last_error = RuntimeError(
+                            "Generated challenge did not pass sandbox validation"
+                        )
+                        continue
+                fac.challenge = generated
+                fac.challenge_source = "gemini"
+                return
+            except Exception as exc:
+                last_error = exc
+
+        if last_error is not None:
+            # The trusted template remains playable if generation is unavailable.
+            logger.warning("Challenge generation failed (%s)", type(last_error).__name__)
+            fac.challenge = _template_challenge(vector)
+            fac.challenge_source = "template"
+            fac.log.append(
+                {
+                    "kind": "info",
+                    "title": "Template challenge loaded",
+                    "detail": "The generated variant was unavailable, so the safe built-in version is active.",
+                }
+            )
+
     @router.post("/sessions")
-    async def create_session(response: Response):
+    async def create_session(response: Response, tasks: BackgroundTasks):
         fac = engine.create()
+        if agents is not None and agents.live_available:
+            fac.challenge_source = "generating"
+            fac.challenge_validation = None
+            tasks.add_task(generate_current_challenge, fac)
         response.delete_cookie("sess", path="/hack")
         response.set_cookie("sess", fac.cookie("guest"), path="/", samesite="lax")
         return fac.public()
@@ -271,9 +512,16 @@ def build_facility_router(
         return engine.reveal_hint(engine.get(sid))
 
     @router.post("/sessions/{sid}/breach")
-    async def breach(sid: str, request: Request):
+    async def breach(sid: str, request: Request, tasks: BackgroundTasks):
         body = await request.json()
-        return engine.breach(engine.get(sid), body.get("flag", ""))
+        fac = engine.get(sid)
+        result = engine.breach(fac, body.get("flag", ""))
+        if agents is not None and agents.live_available and fac.next_vector():
+            fac.challenge_source = "generating"
+            fac.challenge_validation = None
+            tasks.add_task(generate_current_challenge, fac)
+        result["state"] = fac.public()
+        return result
 
     # ---- The vulnerable surface. Each weakness stays open until Mr Kak teaches the patch. ----
 

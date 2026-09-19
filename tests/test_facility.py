@@ -79,8 +79,12 @@ def test_mass_assignment_promotes_to_admin_then_is_patched(client):
 
 def test_hints_and_hardened_state(client):
     sid = new_facility(client)
+    initial = client.get(f"/hack/api/sessions/{sid}").json()
+    assert initial["current_challenge"]["vulnerable_code"]
+    assert initial["current_challenge"]["source"] == "template"
     first = client.post(f"/hack/api/sessions/{sid}/hint").json()
-    assert first["revealed_hints"] and "Simply" in first["revealed_hints"][0]
+    assert first["revealed_hints"]
+    assert len(first["revealed_hints"][0]) > 40
     assert "total" not in first and "open_count" not in first
     # Walk the whole facility shut and confirm it reports hardened.
     for _ in range(10):
@@ -90,6 +94,17 @@ def test_hints_and_hardened_state(client):
         sid_flag = _capture_any(client, sid)
         breach(client, sid, sid_flag)
     assert client.get(f"/hack/api/sessions/{sid}").json()["hardened"] is True
+
+
+def test_next_level_starts_with_a_useful_hint_and_patch_code(client):
+    sid = new_facility(client)
+    flag = _capture_any(client, sid)
+    result = breach(client, sid, flag).json()
+    assert result["patched_code"]
+    assert result["state"]["last_patch"]["code"] == result["patched_code"]
+    assert result["state"]["revealed_hints"]
+    assert len(result["state"]["revealed_hints"][0]) > 40
+    assert result["state"]["current_challenge"]["level"] == 2
 
 
 def _capture_any(client, sid):
