@@ -76,13 +76,14 @@ def _inspect_codebase(label: str, files: list[CodebaseFile]) -> list[EvalCase]:
         for file in files
     )
     unique_paths = len({file.path for file in files}) == len(files)
-    has_app = any(file.path == "app.py" for file in files)
+    required_files = {"app.py", "web/index.html", "README.md"}
+    has_required_files = required_files.issubset({file.path for file in files})
     cases = [
         EvalCase(
             name=f"{label} is a bounded sandbox codebase",
-            passed=2 <= len(files) <= 4 and safe_paths and unique_paths and has_app,
-            detail="Contains two to four safe relative files, including app.py."
-            if 2 <= len(files) <= 4 and safe_paths and unique_paths and has_app
+            passed=3 <= len(files) <= 4 and safe_paths and unique_paths and has_required_files,
+            detail="Contains the required app.py, web/index.html, and README.md at safe relative paths."
+            if 3 <= len(files) <= 4 and safe_paths and unique_paths and has_required_files
             else "Generated codebase is missing files or contains an unsafe path.",
         )
     ]

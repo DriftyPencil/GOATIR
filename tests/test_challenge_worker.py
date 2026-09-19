@@ -6,10 +6,16 @@ def files(vulnerable: str, patched: str):
     return {
         "vulnerable_files": [
             CodebaseFile(path="app.py", purpose="Active route", content=vulnerable),
+            CodebaseFile(
+                path="web/index.html", purpose="Sandbox page", content="<main>Sandbox</main>"
+            ),
             CodebaseFile(path="README.md", purpose="Build note", content="# Sandbox"),
         ],
         "patched_files": [
             CodebaseFile(path="app.py", purpose="Patched route", content=patched),
+            CodebaseFile(
+                path="web/index.html", purpose="Sandbox page", content="<main>Sandbox</main>"
+            ),
             CodebaseFile(path="README.md", purpose="Build note", content="# Sandbox"),
         ],
     }
