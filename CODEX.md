@@ -75,8 +75,11 @@ Opt-in live check: `uv run python scripts/check_gemini.py [--game-loop | --list-
 1. Modal backend is still not exercised. It needs `uv run modal setup` and `EVAL_BACKEND=modal`.
 2. Live mode clicked through in the browser UI: a roleplay attack was refused by Gemini, with no errors. Added an inline SVG favicon to stop a favicon.ico 404.
 3. README screenshots (`docs/*.png`, captured with Playwright plus the installed Chrome) and a 60-second demo script are done.
-4. Blocked on the user's accounts: Modal (`uv run modal setup` needs browser login; no `~/.modal.toml` exists), Logfire (`LOGFIRE_TOKEN`), and any public deployment. Everything else is complete.
-5. Known cosmetic issue: the chat scroll area clips the top message under the mission banner once the chat grows. It's a normal scroll clip, not an overlap bug.
+4. Modal is DONE. There are two local profiles: `driftypencil` (active) and `pranavreddy471`. `EVAL_BACKEND=modal` passed a live round on 2026-09-19: 6/6 checks ran in a Modal sandbox and the replay was blocked. The local `.env` now defaults to `modal`.
+5. `Start Vault.command` is a double-click macOS launcher for non-coders. It installs uv if missing, runs the server, and opens the browser.
+6. Public deployment: `deploy/modal_web.py` is written but NOT deployed yet. It needs a Modal secret named `evolving-vault` holding `GEMINI_API_KEY`. The assistant was not permitted to write secrets, so the user creates it (command in the README). Then run `uv run modal deploy deploy/modal_web.py`. It uses one container because sessions are in memory.
+7. Logfire is optional and still unset (`LOGFIRE_TOKEN`).
+8. Known cosmetic issue: the chat scroll area clips the top message under the mission banner once the chat grows. It's a normal scroll clip, not an overlap bug.
 
 ## Known scope limits
 

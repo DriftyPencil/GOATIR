@@ -10,6 +10,10 @@ Stack: Python 3.11+, uv, FastAPI, Pydantic / PydanticAI, Gemini, Modal (optional
 |---|---|
 | <img src="docs/evaluations.png" width="420"> | <img src="docs/mobile.png" width="260"> |
 
+## Easiest way to run (Mac)
+
+Double-click **`Start Vault.command`**. The game opens in your browser. Close the window to stop it.
+
 ## Quick start
 
 ```sh
@@ -28,6 +32,13 @@ Open http://127.0.0.1:8000. With no key, only **Rehearsal mode** is available. I
 | Live (`live`) | Gemini via PydanticAI (`vault/agents.py`) | `EVAL_BACKEND=local` or `modal` |
 
 Modal: run `uv run modal setup`, then set `EVAL_BACKEND=modal`. If Modal fails, the patch is withheld. It never silently falls back.
+
+## Public deployment (Modal)
+
+```sh
+source .env && uv run modal secret create evolving-vault GEMINI_API_KEY="$GEMINI_API_KEY" --force
+uv run modal deploy deploy/modal_web.py
+```
 
 ## Turn loop
 
