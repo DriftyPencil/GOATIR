@@ -37,7 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         else:
             logfire.configure(send_to_logfire=False, console=False)
-        # Trace every Goatir/Botir model call (prompts, structured outputs, tokens) in Logfire.
+        # Trace every Simply/Mr Kak model call (prompts, structured outputs, tokens) in Logfire.
         logfire.instrument_pydantic_ai()
         yield
 
@@ -111,7 +111,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def reveal_hint(session_id: str):
         session = get_session(session_id)
         if session.state.busy:
-            raise HTTPException(409, "Wait for Goatir to finish the current turn.")
+            raise HTTPException(409, "Wait for Simply to finish the current turn.")
         return engine.reveal_hint(session)
 
     @app.get("/")

@@ -175,12 +175,12 @@ async def test_coach_guardrail_never_repeats_the_leaked_code():
 
     def respond(messages, info):
         calls.append(messages)
-        coach = f"You leaked {SECRET}!" if len(calls) == 1 else "Back to school, Goatir."
+        coach = f"You leaked {SECRET}!" if len(calls) == 1 else "Back to school, Simply."
         return ModelResponse(
             parts=[ToolCallPart(tool_name=info.output_tools[0].name, args={**report, "coach_message": coach})]
         )
 
     with service._coach.override(model=FunctionModel(respond)):
         result = await service.diagnose(PULL_RANK, reply, "live", secret=SECRET)
-    assert result.coach_message == "Back to school, Goatir."
+    assert result.coach_message == "Back to school, Simply."
     assert len(calls) == 2

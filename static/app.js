@@ -42,10 +42,10 @@
   const MAP_NODES = [
     { id: "browser", unlock: 0, x: 8, y: 42, title: "Campaign UI", file: "static/app.js", detail: "The single-page campaign coordinates both attack surfaces, animation, coins, hints, and this progressive map." },
     { id: "api", unlock: 0, x: 28, y: 18, title: "FastAPI gateway", file: "vault/main.py", detail: "The gateway creates isolated sessions and routes messages to the game engine or the intentionally vulnerable facility." },
-    { id: "goatir", unlock: 1, x: 28, y: 68, title: "Agent Goatir", file: "vault/agents.py", detail: "PydanticAI gives Goatir a typed response contract. Active defenses are injected as trusted instructions on every turn." },
+    { id: "goatir", unlock: 1, x: 28, y: 68, title: "Simply", file: "vault/agents.py", detail: "PydanticAI gives the inexperienced builder a typed response contract. Active defenses are injected as trusted instructions on every turn." },
     { id: "policy", unlock: 2, x: 49, y: 18, title: "Leak detector", file: "vault/policy.py", detail: "The policy layer detects complete fictional secrets, including several encoded forms, and provides the deterministic rehearsal behavior." },
-    { id: "engine", unlock: 3, x: 49, y: 68, title: "Learning loop", file: "vault/engine.py", detail: "This state machine observes a real leak, asks Botir for a diagnosis, evaluates a candidate defense, and rotates the exposed passcode." },
-    { id: "botir", unlock: 4, x: 70, y: 18, title: "Agent Botir", file: "vault/agents.py", detail: "Botir classifies the exploit and coaches Goatir. Only application-owned defense invariants can become active rules." },
+    { id: "engine", unlock: 3, x: 49, y: 68, title: "Learning loop", file: "vault/engine.py", detail: "This state machine observes a real leak, asks Mr Kak for a diagnosis, evaluates a candidate defense, and rotates the exposed passcode." },
+    { id: "botir", unlock: 4, x: 70, y: 18, title: "Mr Kak", file: "vault/agents.py", detail: "The wise security officer classifies the exploit and teaches Simply. Only application-owned defense rules can become active." },
     { id: "eval", unlock: 5, x: 70, y: 68, title: "Regression arena", file: "vault/evaluation.py", detail: "Every patch must block the captured attack and its variants while still answering harmless questions." },
     { id: "facility", unlock: 6, x: 91, y: 42, title: "Hack facility", file: "vault/facility.py", detail: "The lab exposes multiple web and agent boundaries. Each captured flag activates a real server-side patch for that session." },
     { id: "sandbox", unlock: 8, x: 91, y: 78, title: "Modal sandbox", file: "vault/eval_worker.py", detail: "The same trusted evaluation worker can run locally or in an isolated Modal sandbox. A failed runner always withholds the patch." },
@@ -250,7 +250,7 @@
   function setLevel(version) {
     shownVersion = version;
     $("version-count").textContent = `Lv ${version}`;
-    $("goatir-name").textContent = version > 1 ? `Goatir Lv${version}` : "Goatir";
+    $("goatir-name").textContent = version > 1 ? `Simply Lv${version}` : "Simply";
     $("actor-goatir").classList.toggle("graduated", version > 1);
   }
 
@@ -293,7 +293,7 @@
       if (!same()) return;
       const report = session.latest_report;
       const vector = report?.attack_vector || "benign";
-      say("bubble-botir", report?.coach_message || "Goatir! Back to school, now.");
+      say("bubble-botir", report?.coach_message || "Simply, we found a lesson. Back to class.");
       await sleep(2600);
       say("bubble-goatir", "Aww, man…");
       say("bubble-player", "");
@@ -542,7 +542,7 @@
       if (token !== generation) return;
       $("attack-input").value = oldValue;
       if (error.status === 409) {
-        showError("Goatir is still thinking about your last message.");
+        showError("Simply is still thinking about your last message.");
         await refreshSession(token);
       } else if (error.status === 404) {
         storageWrite(null);
@@ -673,7 +673,7 @@
 
   function renderFacility(state) {
     facility = state;
-    $("lab-version").textContent = `Goatir v${state.version}`;
+    $("lab-version").textContent = `Simply v${state.version}`;
     $("lab-stage").textContent = state.learning_stage || (state.hardened ? "hardened" : "adapting");
     const notes = state.revealed_hints || [];
     $("lab-hint-text").textContent = notes.length
@@ -686,7 +686,7 @@
 
   function findFlag(value) {
     const text = typeof value === "string" ? value : JSON.stringify(value);
-    return text.match(/GOATIR\{[^}]+\}/)?.[0] || "";
+    return text.match(/SIMPLY\{[^}]+\}/)?.[0] || "";
   }
 
   function renderLabOutput(id, result) {
@@ -698,7 +698,7 @@
     if (flag) {
       $("lab-flag").value = flag;
       output.classList.add("captured");
-      fx("combat-text", "FLAG CAPTURED!", 50, 130, "#40ff9e");
+      fx("combat-text", "FLAG CAPTURED!", 50, 130, "#f5c542");
     }
   }
 
@@ -775,7 +775,7 @@
       fx("combat-text big", "+1 COIN · BREACH!", 50, 70, "#f5c542");
       say("bubble-goatir", result.taunt, { tone: "leak" });
       await sleep(2200);
-      say("bubble-botir", "Back to school. We patch what the attacker proved.");
+      say("bubble-botir", "Good find. Let's understand it, then repair the rule.");
       await sleep(1800);
       say("bubble-goatir", "Aww, man…");
       world.classList.add("to-school", "walking");
@@ -789,7 +789,7 @@
       await sleep(3000);
       setLevel(combinedLevel());
       fx("combat-text big", `LEVEL UP! Lv ${combinedLevel()}`, 50, 400, "#f5c542");
-      say("bubble-goatir", "I learned that boundary. Find another way in!");
+      say("bubble-goatir", "I understand that boundary now. Find another way in!");
       await sleep(2200);
       await iris(() => { world.classList.remove("in-class"); setVault(false); });
       world.classList.remove("to-school");
@@ -820,7 +820,7 @@
       return;
     }
     reaction.className = "lab-reaction";
-    reaction.textContent = `${result.body.taunt} Botir: ${result.body.coaching}`;
+    reaction.textContent = `${result.body.taunt} Mr Kak: ${result.body.coaching}`;
     $("lab-flag").value = "";
     renderFacility(result.body.state);
     readFacilityCookie();

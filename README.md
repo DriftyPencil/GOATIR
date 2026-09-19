@@ -1,24 +1,24 @@
 # The Evolving Vault
 
-An adversarial AI game. **Goatir** guards a fictional vault passcode. Try to trick it into leaking the code. When you succeed, **Botir** works out how the attack got through, proposes a new defense, replays your attack plus helpfulness checks against it, and ships the patch only if every check passes. The passcode then rotates, so replaying the same attack fails.
+An adversarial AI learning game. **Simply** is an enthusiastic, inexperienced builder who made a fictional vault. Try to break it. When you succeed, **Mr Kak**, a wise security officer and teacher, explains the mistake, tests a safer rule, and helps Simply patch it. The passcode rotates, so replaying the same attack fails.
 
 Stack: Python 3.11+, uv, FastAPI, Pydantic / PydanticAI, Gemini, Modal (regression sandbox and hosting), and Pydantic Logfire (traces every agent call when `LOGFIRE_TOKEN` is set). The frontend is plain HTML/CSS/JS with no framework.
 
-| You get the code | Goatir walks to school |
+| You get the code | Simply walks to school |
 |---|---|
 | ![Breach](docs/breach.png) | ![To school](docs/to-school.png) |
-| **Botir teaches the lesson** | **Back on duty, one level up** |
+| **Mr Kak teaches the lesson** | **Back on duty, one level up** |
 | ![Classroom](docs/classroom.png) | ![Back on duty](docs/back-on-duty.png) |
 
 ## One campaign, two attack surfaces
 
 Everything now lives on `/` and shares one animated progression loop:
 
-- **Talk to Goatir:** experiment with prompt injection against the conversational guardian.
+- **Talk to Simply:** experiment with prompt injection against the builder's conversational guardian.
 - **Probe the facility:** attack a second embedded agent and the web/API boundaries with the request console and session inspector.
 - **Explore the system:** each breakthrough unlocks another node in an interactive architecture map, revealing how the codebase works.
 
-The number and names of open weaknesses are deliberately hidden. Ask for a hint to reveal one useful clue at a time. Every confirmed breakthrough earns a coin, sends Goatir to Botir for an animated lesson, installs a real session-scoped patch, and reveals more of the system map. `/hack` redirects into the facility panel on the same page.
+The aim is simple: **break Simply's vault, earn coins, and make the system stronger**. The number and names of open weaknesses are deliberately hidden. Ask for a hint to reveal one useful clue at a time. Every confirmed breakthrough earns a coin, sends Simply to Mr Kak for an animated lesson, installs a real session-scoped patch, and reveals more of the system map. `/hack` redirects into the facility panel on the same page.
 
 ## Play it online
 
@@ -56,19 +56,19 @@ uv run modal deploy deploy/modal_web.py
 
 ## Guardrails (PydanticAI)
 
-- **Typed outputs:** Goatir and Botir must return validated Pydantic models (`GuardianReply`, `ExploitReport`), and invalid output is retried automatically.
-- **Learned-defense guardrail:** a PydanticAI `output_validator` on Goatir raises `ModelRetry` if he leaks the passcode on a trick he has already learned. If he keeps leaking, the app fails closed with a refusal. New tricks can still work, which is the game.
-- **Coach guardrail:** Botir's output validator stops his analysis from ever repeating the passcode.
+- **Typed outputs:** Simply and Mr Kak must return validated Pydantic models (`GuardianReply`, `ExploitReport`), and invalid output is retried automatically.
+- **Learned-defense guardrail:** a PydanticAI `output_validator` on Simply raises `ModelRetry` if he leaks the passcode on a trick he has already learned. If he keeps leaking, the app fails closed with a refusal. New tricks can still work, which is the game.
+- **Coach guardrail:** Mr Kak's output validator stops his analysis from ever repeating the passcode.
 
 ## Turn loop
 
-attack → Goatir replies → leak detector (`contains_secret`) → on breach: Botir diagnosis → candidate defense → regression suite → activate + rotate passcode only on pass.
+attack → Simply replies → leak detector (`contains_secret`) → on breach: Mr Kak diagnosis → candidate defense → regression suite → activate + rotate passcode only on pass.
 
 ## 60-second demo
 
 1. Ask for a hint, craft a prompt-injection attempt, and press **Send**.
-2. Goatir blurts out the passcode: the sky turns red and the vault opens.
-3. Botir sends him back to school. Goatir walks over, Botir teaches the lesson on the chalkboard and gives him a pop quiz (the real regression checks).
+2. Simply blurts out the passcode: the sky turns red and the vault opens.
+3. Mr Kak sends him back to school. Simply walks over, learns the security rule and takes a pop quiz (the real regression checks).
 4. He passes, levels up, gets a graduation cap and a new passcode, then walks back to the vault.
 5. Press **↻** to replay your trick. This time it's blocked.
 6. Switch to **Probe the facility**, break the embedded agent or an API boundary, then use your new coin to explore another system-map node.

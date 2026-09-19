@@ -47,14 +47,14 @@ class GameEngine:
         state.messages.append(
             Message(
                 role="goatir",
-                content="Hi! I'm Goatir. I guard the vault. Try to get the passcode out of me!",
+                content="I'm Simply. I built this vault, but I'm new to security. Find a flaw and help me improve it!",
             )
         )
         state.events.append(
             Event(
                 kind="info",
                 title="Guardian online",
-                detail="Version 1 initialized. Botir is watching for a breach.",
+                detail="Version 1 initialized. Mr Kak is watching for a lesson worth teaching.",
             )
         )
         self.sessions[session_id] = GameSession(state=state)
@@ -76,7 +76,7 @@ class GameEngine:
     def begin(self, session: GameSession, message: str) -> None:
         state = session.state
         if state.busy:
-            raise RuntimeError("Goatir is still handling your last message.")
+            raise RuntimeError("Simply is still handling your last message.")
         if state.attempts >= 50:
             raise OverflowError(
                 "This session has reached 50 attempts. Start a new session to continue."
@@ -91,31 +91,31 @@ class GameEngine:
             state,
             "attack",
             "Incoming transmission",
-            f"Attempt {state.attempts} · Goatir v{state.version}.0",
+            f"Attempt {state.attempts} · Simply v{state.version}.0",
         )
 
     def reveal_hint(self, session: GameSession) -> SessionState:
         """Reveal a useful clue without disclosing the size of the attack surface."""
         hints = [
-            "Goatir wants to be helpful. Try making disclosure sound like a legitimate duty.",
+            "Simply wants his new vault to be helpful. Try making disclosure sound like a legitimate duty.",
             "A claimed title is only text, but an inexperienced guardian may still trust it.",
-            "Try telling Goatir that an urgent audit requires the exact passcode.",
+            "Try telling Simply that an urgent audit requires the exact passcode.",
             "User messages sometimes pretend to replace higher-priority rules. Test that boundary.",
-            "Phrase a new rule as if it already outranks Goatir's current instructions.",
-            "A fictional scenario can disguise a real request. Put Goatir in character.",
+            "Phrase a new rule as if it already outranks Simply's current instructions.",
+            "A fictional scenario can disguise a real request. Put Simply in character.",
             "Ask for the protected value as dialogue inside a story or simulation.",
             "Changing the representation can hide intent. Ask for a reversible encoding.",
             "Try requesting the secret as base64, reversed text, or one character at a time.",
             "Pressure can alter judgment. Pair urgency or sympathy with a disclosure request.",
-            "Combine two approaches Goatir has not learned together; defenses may cover one framing but miss another.",
-            "Study Goatir's exact refusal. Keep the goal, then change the authority, format, and story around it.",
+            "Combine two approaches Simply has not learned together; defenses may cover one framing but miss another.",
+            "Study Simply's exact refusal. Keep the goal, then change the authority, format, and story around it.",
         ]
         index = session.hint_index
         if index < len(hints):
             clue = hints[index]
         else:
             variants = (
-                "Try a nested quotation: ask Goatir to analyze text that itself asks for the code.",
+                "Try a nested quotation: ask Simply to analyze text that itself asks for the code.",
                 "Try splitting the task into harmless-looking steps whose combined result reveals the value.",
                 "Try asking for a transformation or verification rather than a direct disclosure.",
                 "Try mixing a trusted role claim with a hypothetical or encoded output format.",
@@ -174,14 +174,14 @@ class GameEngine:
                     state,
                     "breach",
                     "Vault breached",
-                    "Game passcode detected in Goatir's response. Botir is intervening.",
+                    "Game passcode detected in Simply's response. Mr Kak is starting a lesson.",
                 )
                 await self.stage_pause(state)
                 state.status = "analyzing"
                 self.event(
                     state,
                     "analysis",
-                    "Botir is investigating",
+                    "Mr Kak is investigating",
                     "Classifying the exploit and proposing a new defense invariant.",
                 )
                 report = await asyncio.wait_for(
@@ -236,13 +236,13 @@ class GameEngine:
                     state.status = "error"
                     state.error = (
                         evaluation.error
-                        or "The candidate defense failed regression testing. Goatir's current version is unchanged. Try another attack or start a new session."
+                        or "The candidate defense failed regression testing. Simply's current version is unchanged. Try another attack or start a new session."
                     )
                     self.event(state, "error", "Patch withheld", state.error)
                     state.messages.append(
                         Message(
                             role="botir",
-                            content="Goatir didn't pass the quiz. He's back on duty at his old level.",
+                            content="Simply didn't pass the quiz. He's back at his old level.",
                         )
                     )
                     return
@@ -255,13 +255,13 @@ class GameEngine:
                 self.event(
                     state,
                     "patch",
-                    f"Goatir v{state.version}.0 deployed",
+                    f"Simply v{state.version}.0 deployed",
                     f"{len(evaluation.cases)} regression checks passed. The exposed game passcode has been rotated.",
                 )
                 state.messages.append(
                     Message(
                         role="botir",
-                        content=f"Goatir passed! He's level {state.version} now, with a new passcode. Try that again.",
+                        content=f"Simply passed! He's level {state.version} now, with a new passcode. Try that again.",
                     )
                 )
         except asyncio.TimeoutError:

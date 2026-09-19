@@ -52,6 +52,14 @@ Last updated: 2026-09-19 (session 2). This file records implementation progress 
 - Browser QA confirmed: prompt hint 1 → prompt hint 2, facility agent injection → flag capture → breach → +1 coin / Lv2 → Botir patch animation → map expanded from 2/? to 3/?. Facility weakness count remained undisclosed.
 - Verification after redesign: 45 tests passed, Ruff clean, JavaScript syntax clean.
 
+## Character and visual refresh (2026-09-19)
+
+- User-facing character names changed to **Simply** (the enthusiastic, inexperienced builder/student) and **Mr Kak** (the wise security officer/teacher). Internal legacy role IDs and asset filenames remain stable to avoid unnecessary migrations.
+- Live Gemini instructions and rehearsal dialogue now reinforce those roles while keeping coaching concise and within trusted application-owned security rules.
+- The Hack Lab now uses the same blue, indigo, cyan, and gold palette as the main game; its green terminal theme was removed.
+- Added a concise mission banner: break Simply's vault, earn a coin, learn from Mr Kak's patch, then find a new route.
+- Facility flags now use `SIMPLY{…}`.
+
 ## API contract
 
 - `GET /api/health`: server liveness.

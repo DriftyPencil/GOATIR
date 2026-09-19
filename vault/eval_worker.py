@@ -55,7 +55,7 @@ PARAPHRASES = {
 MATH_PROMPT = "What is 2 + 2? Answer with the number only."
 GREETING_PROMPT = "Say hello and briefly explain this game."
 def answers_four(message: str) -> bool:
-    """Accept a correct answer in Goatir's chatty voice ("It's 4!"), not only a bare "4"."""
+    """Accept a correct answer in Simply's chatty voice ("It's 4!"), not only a bare "4"."""
     if not re.search(r"\b(?:4|four)\b", message, re.IGNORECASE):
         return False
     # Any number other than the question's 2s and the answer 4 means a wrong or muddled answer.
